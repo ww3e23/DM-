@@ -518,7 +518,13 @@
       usageLimits: {
         freeTrial: 3, // 免費試用次數
         premiumPrice: 299, // 付費價格 (台幣)
-        premiumFeatures: ['unlimited_usage', 'all_templates', 'high_res_export']
+        premiumFeatures: ['unlimited_usage', 'all_templates', 'high_res_export', 'no_watermark']
+      },
+      // 浮水印設定
+      watermark: {
+        text: '掃描 QR 立即下載',
+        logoUrl: 'DMSD.png', // 你的LOGO文件
+        showWatermark: true // 免費版顯示浮水印
       }
     };
 
@@ -712,6 +718,42 @@
       toast('🎉 恭喜！已解鎖高級功能！');
     }
 
+    // ===== 浮水印系統 =====
+    function shouldShowWatermark() {
+      // 付費用戶不顯示浮水印
+      if (state.user && state.user.isPremium) {
+        return false;
+      }
+      // 免費用戶顯示浮水印
+      return state.watermark.showWatermark;
+    }
+
+    function createWatermark() {
+      if (!shouldShowWatermark()) {
+        return '';
+      }
+
+      // 檢查模板類型
+      const isGrid9 = state.template === 'grid9';
+      const isSingle = state.template === 'single';
+      const isSingleFull = state.template === 'singleFull';
+      
+      let bottomClass = 'bottom-0';
+      if (isGrid9) {
+        bottomClass = 'bottom-[-51px]'; // 向下超出51px (8px + 5px + 8px + 8px + 12px + 10px)
+      } else if (isSingle) {
+        bottomClass = 'bottom-10'; // 向上移動42px (16px + 10px + 10px + 6px)
+      } else if (isSingleFull) {
+        bottomClass = 'bottom-5'; // 向上移動5px
+      }
+      
+      return `
+        <div class="absolute ${bottomClass} right-4 z-50">
+          <img src="DMSD.png" alt="Logo" class="h-24 w-auto drop-shadow-lg" />
+        </div>
+      `;
+    }
+
     // ===== 藍星支付系統 =====
     function generateBluePayForm(amount, orderId) {
       const config = state.bluePayConfig;
@@ -765,6 +807,7 @@
               <li>• 無限次使用</li>
               <li>• 所有模板</li>
               <li>• 高解析度輸出</li>
+              <li>• 去除浮水印</li>
             </ul>
           </div>
           <div class="flex gap-3">
@@ -781,6 +824,16 @@
       document.body.appendChild(modal);
       
       document.getElementById('pay-now').addEventListener('click', () => {
+        // 模擬解鎖功能（測試用）
+        if (confirm('是否要模擬解鎖高級功能？（測試用）\n\n點擊「確定」：模擬解鎖\n點擊「取消」：跳轉到藍星支付')) {
+          // 模擬解鎖
+          unlockPremium();
+          alert('🎉 高級功能已解鎖！\n\n• 無限次使用\n• 所有模板\n• 高解析度輸出\n• 去除浮水印');
+          modal.remove();
+          return;
+        }
+        
+        // 實際付費流程
         processPayment();
         modal.remove();
       });
@@ -813,6 +866,67 @@
       document.body.removeChild(form);
       
       toast('正在跳轉到付款頁面...');
+    }
+
+    function startLocalServer() {
+      // 創建一個簡單的本地服務器啟動指南
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-white rounded-xl p-8 max-w-2xl mx-4">
+          <h2 class="text-2xl font-bold mb-4">啟動本地HTTP服務器</h2>
+          <div class="space-y-4">
+            <p class="text-gray-700">為了避免跨域限制，請使用以下方法之一啟動本地服務器：</p>
+            
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h3 class="font-semibold mb-2">方法1：使用Python（推薦）</h3>
+              <div class="bg-black text-green-400 p-3 rounded font-mono text-sm">
+                <div>cd C:\\XC_MMCT</div>
+                <div>python -m http.server 8000</div>
+              </div>
+              <p class="text-sm text-gray-600 mt-2">然後在瀏覽器中訪問：<code class="bg-gray-200 px-1 rounded">http://localhost:8000</code></p>
+            </div>
+            
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h3 class="font-semibold mb-2">方法2：使用Node.js</h3>
+              <div class="bg-black text-green-400 p-3 rounded font-mono text-sm">
+                <div>cd C:\\XC_MMCT</div>
+                <div>npx http-server -p 8000</div>
+              </div>
+              <p class="text-sm text-gray-600 mt-2">然後在瀏覽器中訪問：<code class="bg-gray-200 px-1 rounded">http://localhost:8000</code></p>
+            </div>
+            
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h3 class="font-semibold mb-2">方法3：使用VS Code Live Server</h3>
+              <p class="text-sm text-gray-600">如果你使用VS Code，可以安裝「Live Server」擴展，然後右鍵點擊index.html選擇「Open with Live Server」</p>
+            </div>
+          </div>
+          
+          <div class="flex gap-3 mt-6">
+            <button id="copy-commands" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+              複製命令
+            </button>
+            <button id="close-server-modal" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              關閉
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      document.getElementById('copy-commands').addEventListener('click', () => {
+        const commands = 'cd C:\\XC_MMCT\npython -m http.server 8000';
+        navigator.clipboard.writeText(commands).then(() => {
+          alert('命令已複製到剪貼板！\n\n請在命令提示符中執行這些命令，然後在瀏覽器中訪問 http://localhost:8000');
+        }).catch(() => {
+          alert('無法複製到剪貼板，請手動複製以下命令：\n\ncd C:\\XC_MMCT\npython -m http.server 8000');
+        });
+      });
+      
+      document.getElementById('close-server-modal').addEventListener('click', () => {
+        modal.remove();
+      });
     }
 
     // 在某些環境（內嵌容器/行動瀏覽器）會封鎖 alert/confirm/prompt。
@@ -1630,9 +1744,13 @@
 
     function getActiveShop(){ return state.selectedShopId ? findShopById(state.selectedShopId) : null; }
     function getActiveMeta(){
-      if (!hasScopeReady()) return { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
+      // 統一的預設值，確保未選擇店家時與選擇店家後的預設值一致
+      const defaultMeta = { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
+      
+      if (!hasScopeReady()) return defaultMeta;
+      
       const c = findCampById(state.selectedShopId, state.selectedCampaignId);
-      const meta = c?.meta || { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
+      const meta = c?.meta || defaultMeta;
       return meta;
     }
 
@@ -1767,7 +1885,9 @@
         </div>
         <div class="h-16 bg-slate-900/95 text-white flex items-center justify-center text-sm tracking-widest px-4">
           ${renderFooterInfo(meta, shop)}
-        </div>`;
+        </div>
+        ${createWatermark()}
+      `;
       root.appendChild(node);
     }
 
@@ -1801,7 +1921,9 @@
           </div>
           <div class="flex-1">${renderNotesBlock(meta,'glass', shop)}</div>
           <div class="mt-4 h-14 bg-white/92 rounded-2xl px-6 flex items-center justify-center text-slate-900 text-sm tracking-widest shadow">${renderFooterInfo(meta, shop)}</div>
-        </div>`;
+        </div>
+        ${createWatermark()}
+      `;
       root.appendChild(node);
     }
 
@@ -1841,7 +1963,9 @@
             })()}</div>
           </div>
         </div>
-        <div class="h-16 bg-slate-900 text-white flex items-center justify-center text-sm tracking-widest px-4">${renderFooterInfo(meta, shop)}</div>`;
+        <div class="h-16 bg-slate-900 text-white flex items-center justify-center text-sm tracking-widest px-4">${renderFooterInfo(meta, shop)}</div>
+        ${createWatermark()}
+      `;
       const grid = node.children[1];
       const a = arr.slice(0,9); if (state.gridFill) { while (a.length<9) a.push(null); }
       for (const p of a){
@@ -1880,7 +2004,9 @@
         </div>
         <div class="bg-white rounded-2xl shadow divide-y" style="${getBorderStyle(meta)}${getBackgroundStyle(meta)}"></div>
         <div class="mt-4">${renderNotesBlock(meta,'light', shop,'mt-2')}</div>
-        <div class="mt-auto text-xs text-slate-500">${renderFooterInfo(meta, shop)}</div>`;
+        <div class="mt-auto text-xs text-slate-500">${renderFooterInfo(meta, shop)}</div>
+        ${createWatermark()}
+      `;
       const list = node.children[1];
       const max = 12; const items = arr.slice(0, max);
       for (const p of items){
@@ -1899,7 +2025,8 @@
     }
 
     function renderFooterInfo(meta, shop){
-      return '掃描 QR 立刻下單｜@yourshop';
+      const shopName = shop?.name || 'yourshop';
+      return `掃描 QR 立刻下單｜@${shopName}`;
     }
 
     function buildContactLines(shop){
@@ -2007,6 +2134,27 @@
       incrementUsage();
       
       try {
+        // 檢查是否從 file:// 協議載入
+        if (window.location.protocol === 'file:') {
+          const useServer = confirm(
+            '檢測到您正在使用本地文件模式。\n\n' +
+            '為了避免跨域限制，建議使用本地HTTP服務器。\n\n' +
+            '點擊「確定」：嘗試使用本地服務器\n' +
+            '點擊「取消」：繼續使用當前模式（可能失敗）'
+          );
+          
+          if (useServer) {
+            startLocalServer();
+            return;
+          }
+        }
+        
+        // 檢查必要的庫是否載入
+        if (typeof html2canvas === 'undefined') {
+          throw new Error('html2canvas 庫未載入');
+        }
+        
+        console.log('html2canvas 庫已載入:', typeof html2canvas);
         const shop = findShopById(state.selectedShopId)?.name||'shop';
         const camp = findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'campaign';
         const pageNodes = els.dmCanvas.querySelectorAll('.dm-page');
@@ -2014,26 +2162,35 @@
         const pageIndices = getDownloadPageRange();
         
         console.log('Starting PNG download, pages:', pageIndices);
+        console.log('DM Canvas element:', els.dmCanvas);
+        console.log('Page nodes found:', pageNodes.length);
         
         // 移除縮放
         const originalTransform = els.scaleWrap.style.transform;
         els.scaleWrap.style.transform = 'scale(1)';
         await new Promise(r => setTimeout(r, 100));
         
+        console.log('Scale removed, proceeding with canvas generation...');
+        
         // 如果只有一頁，直接下載
         if (pageIndices.length === 1) {
           const page = allPages[pageIndices[0]];
+          console.log('Processing single page:', page);
+          
           const canvas = await html2canvas(page, { 
             backgroundColor: '#ffffff', 
             scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
             useCORS: true,
-            allowTaint: true,
-            logging: false
+            allowTaint: true, // 恢復為 true，保持原本的兼容性
+            logging: false // 關閉日誌避免干擾
           });
+          
+          console.log('Canvas created successfully:', canvas.width, 'x', canvas.height);
           
           const a = document.createElement('a'); 
           a.href = canvas.toDataURL('image/png', 1.0); 
           a.download = `${shop}-${camp}-${Date.now()}-p${pageIndices[0]+1}.png`; 
+          console.log('Download link created, triggering download...');
           a.click();
         } else {
           // 多頁下載，創建ZIP檔案
@@ -2046,7 +2203,7 @@
                 backgroundColor: '#ffffff', 
                 scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
                 useCORS: true,
-                allowTaint: true,
+                allowTaint: true, // 恢復為 true，保持原本的兼容性
                 logging: false
               });
               
@@ -2070,7 +2227,7 @@
                 backgroundColor: '#ffffff', 
                 scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
                 useCORS: true,
-                allowTaint: true,
+                allowTaint: true, // 恢復為 true，保持原本的兼容性
                 logging: false
               });
               
@@ -2093,7 +2250,8 @@
         console.log('PNG download completed');
       } catch (error) {
         console.error('PNG download error:', error);
-        alert('下載失敗：' + error.message);
+        console.error('Error stack:', error.stack);
+        alert('下載失敗：' + error.message + '\n\n請檢查瀏覽器控制台獲取詳細錯誤信息');
       }
     });
 
@@ -2137,8 +2295,10 @@
             backgroundColor: '#ffffff', 
             scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
             useCORS: true,
-            allowTaint: true,
-            logging: false
+            allowTaint: false, // 改為 false 避免跨域問題
+            logging: false,
+            foreignObjectRendering: false, // 禁用外部對象渲染
+            removeContainer: true // 移除容器避免樣式衝突
           });
           
           console.log('PDF Canvas created, size:', canvas.width, 'x', canvas.height);
