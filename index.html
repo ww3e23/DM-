@@ -739,6 +739,8 @@
       const isSingleFull = state.template === 'singleFull';
       
       let bottomClass = 'bottom-0';
+      // 指定LOGO檔：九宮格使用 DMSD(2).png，其餘維持預設
+      const logoSrc = isGrid9 ? 'DMSD(2).png' : (state.watermark?.logoUrl || 'DMSD.png');
       if (isGrid9) {
         // 置於黑條上方 55px（原20再上移35）=> 64 + 55 = 119px
         bottomClass = 'bottom-[119px]';
@@ -750,7 +752,7 @@
       
       return `
         <div class="absolute ${bottomClass} right-6 z-50">
-          <img src="DMSD.png" alt="Logo" class="h-24 w-auto drop-shadow-lg" />
+          <img src="${logoSrc}" alt="Logo" class="h-24 w-auto drop-shadow-lg" />
         </div>
       `;
     }
