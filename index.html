@@ -740,7 +740,8 @@
       
       let bottomClass = 'bottom-0';
       if (isGrid9) {
-        bottomClass = 'bottom-[-51px]'; // 向下超出51px (8px + 5px + 8px + 8px + 12px + 10px)
+        // 貼齊底部深色橫條內，避免導出時超出被裁切，確保與預覽一致
+        bottomClass = 'bottom-0';
       } else if (isSingle) {
         bottomClass = 'bottom-10'; // 向上移動42px (16px + 10px + 10px + 6px)
       } else if (isSingleFull) {
@@ -748,7 +749,7 @@
       }
       
       return `
-        <div class="absolute ${bottomClass} right-4 z-50">
+        <div class="absolute ${bottomClass} right-6 z-50">
           <img src="DMSD.png" alt="Logo" class="h-24 w-auto drop-shadow-lg" />
         </div>
       `;
