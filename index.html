@@ -121,6 +121,7 @@
           <span id="usage-display" class="text-sm font-medium"></span>
           <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
           <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
+          <button id="reset-user" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-yellow-100">重置用戶</button>
         </div>
       </div>
 
@@ -527,6 +528,7 @@
       loginLINE: document.getElementById('login-line'),
       loginState: document.getElementById('login-state'),
       resetData: document.getElementById('reset-data'),
+      resetUser: document.getElementById('reset-user'),
       // Shops & Campaigns
       shopCard: document.getElementById('shop-camp-card'),
       shopPills: document.getElementById('shop-pill-list'),
@@ -610,21 +612,42 @@
     function initUser() {
       const savedUser = localStorage.getItem('dm_user');
       if (savedUser) {
-        state.user = JSON.parse(savedUser);
+        try {
+          state.user = JSON.parse(savedUser);
+          // 確保用戶對象有必要的屬性
+          if (typeof state.user.isPremium === 'undefined') {
+            state.user.isPremium = false;
+          }
+          if (typeof state.user.usageCount === 'undefined') {
+            state.user.usageCount = 0;
+          }
+          if (typeof state.user.maxUsage === 'undefined') {
+            state.user.maxUsage = state.usageLimits.freeTrial;
+          }
+          console.log('載入現有用戶:', state.user);
+        } catch (e) {
+          console.error('解析用戶數據失敗:', e);
+          createNewUser();
+        }
       } else {
-        // 創建匿名用戶
-        state.user = {
-          id: 'anonymous_' + Date.now(),
-          name: '訪客',
-          email: null,
-          isPremium: false,
-          usageCount: 0,
-          maxUsage: state.usageLimits.freeTrial,
-          createdAt: new Date().toISOString()
-        };
-        saveUser();
+        createNewUser();
       }
       updateUsageDisplay();
+    }
+    
+    function createNewUser() {
+      // 創建匿名用戶
+      state.user = {
+        id: 'anonymous_' + Date.now(),
+        name: '訪客',
+        email: null,
+        isPremium: false,
+        usageCount: 0,
+        maxUsage: state.usageLimits.freeTrial,
+        createdAt: new Date().toISOString()
+      };
+      saveUser();
+      console.log('創建新用戶:', state.user);
     }
 
     function saveUser() {
@@ -644,6 +667,18 @@
     }
 
     function checkUsageLimit() {
+      console.log('檢查使用限制:', {
+        user: state.user,
+        isPremium: state.user?.isPremium,
+        usageCount: state.user?.usageCount,
+        maxUsage: state.user?.maxUsage
+      });
+      
+      if (!state.user) {
+        console.log('用戶未初始化，顯示付費視窗');
+        return false;
+      }
+      
       if (state.user.isPremium) return true;
       return state.user.usageCount < state.user.maxUsage;
     }
@@ -1084,6 +1119,18 @@
         // 退出登入，回到初始狀態
         setUser(null); state.selectedShopId=null; state.selectedCampaignId=null; renderShopPills(); renderCampaignPills(); updateGating(); renderChosenSummary(); reloadPresets(); toast('已重置本機資料');
       }catch(e){ console.error(e); toast('重置失敗，請手動清除瀏覽器儲存'); }
+    });
+
+    // 重置用戶數據（僅重置使用次數和付費狀態）
+    els.resetUser.addEventListener('click', ()=>{
+      try{
+        localStorage.removeItem('dm_user');
+        initUser();
+        toast('用戶數據已重置，使用次數恢復為3次');
+      }catch(e){ 
+        console.error(e); 
+        toast('重置失敗'); 
+      }
     });
 
     // ===== 圖片處理 =====
@@ -2436,9 +2483,6 @@
 
     // ===== 初始化 =====
     (function init(){
-      // 初始化用戶管理系統
-      initUser();
-      
       // Demo 商品
       const demo = [
         { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
