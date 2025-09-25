@@ -740,8 +740,8 @@
       
       let bottomClass = 'bottom-0';
       if (isGrid9) {
-        // 貼齊底部深色橫條內，避免導出時超出被裁切，確保與預覽一致
-        bottomClass = 'bottom-0';
+        // 置於黑條上方 55px（原20再上移35）=> 64 + 55 = 119px
+        bottomClass = 'bottom-[119px]';
       } else if (isSingle) {
         bottomClass = 'bottom-10'; // 向上移動42px (16px + 10px + 10px + 6px)
       } else if (isSingleFull) {
