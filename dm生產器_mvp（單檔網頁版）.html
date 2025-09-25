@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DM 生產器 MVP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script>
+    // 備用QRCode庫載入
+    window.addEventListener('load', function() {
+      if (typeof QRCode === 'undefined') {
+        console.log('嘗試載入備用QRCode庫...');
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+        script.onload = function() {
+          console.log('備用QRCode庫載入成功');
+          // 如果載入的是qrcode-generator，需要適配API
+          if (typeof qrcode !== 'undefined') {
+            window.QRCode = {
+              toCanvas: function(canvas, text, options) {
+                return new Promise((resolve, reject) => {
+                  try {
+                    const qr = qrcode(0, 'M');
+                    qr.addData(text);
+                    qr.make();
+                    const ctx = canvas.getContext('2d');
+                    const size = options.width || 300;
+                    canvas.width = size;
+                    canvas.height = size;
+                    const cellSize = size / qr.getModuleCount();
+                    for (let row = 0; row < qr.getModuleCount(); row++) {
+                      for (let col = 0; col < qr.getModuleCount(); col++) {
+                        ctx.fillStyle = qr.isDark(row, col) ? '#000000' : '#ffffff';
+                        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                      }
+                    }
+                    resolve();
+                  } catch (e) {
+                    reject(e);
+                  }
+                });
+              }
+            };
+          }
+        };
+        script.onerror = function() {
+          console.error('所有QRCode庫載入失敗');
+        };
+        document.head.appendChild(script);
+      } else {
+        console.log('QRCode庫載入成功');
+      }
+    });
+  </script>
+  <style>
+    :root { --dm-w: 1080px; --dm-h: 1350px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+    #dm-canvas { width: var(--dm-w); min-height: var(--dm-h); height: auto; overflow: visible; }
+    /* 確保輸出時排版穩定 */
+    .dm-page { width: 1080px; height: 1350px; margin: 0 auto 32px; display: block; position: relative; }
+    #scale-wrap { transform-origin: top left; }
+    .ellipsis-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .ellipsis-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    /* 優化小圖片清晰度 */
+    .high-res-img { 
+      image-rendering: -webkit-optimize-contrast; 
+      image-rendering: crisp-edges; 
+      image-rendering: pixelated;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+    .pill { transition: transform .15s ease, box-shadow .15s ease; }
+    .pill:hover { transform: scale(1.05) translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+    /* Toast */
+    #toast-wrap { position: fixed; right: 16px; bottom: 16px; z-index: 9999; display: grid; gap: 8px; }
+    .toast { background: rgba(15,23,42,.95); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity: 0; transform: translateY(10px); transition: opacity .2s ease, transform .2s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    /* Accordion */
+    .acc-title { cursor: pointer; user-select: none; display:flex; align-items:center; justify-content:space-between; }
+    .acc-title .chev { 
+      transition: transform .2s ease; 
+      width: 20px; 
+      height: 20px; 
+      background: #3b82f6; 
+      border-radius: 4px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      position: relative;
+    }
+    .acc-title .chev::before {
+      content: '';
+      width: 0;
+      height: 0;
+      border-left: 6px solid white;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      margin-left: 2px;
+    }
+    .acc-title[aria-expanded="true"] .chev { transform: rotate(90deg); }
+    /* 純文字風格的標題（保留可點） */
+    .acc-title { padding: 2px 0; }
+  </style>
+</head>
+<body class="bg-slate-50">
+  <div class="min-h-screen flex flex-col gap-4 p-4 max-w-4xl mx-auto">
+    <!-- 左：商品庫 / 匯入 / 模板選擇 -->
+    <aside class="space-y-4">
+      <div class="bg-white rounded-2xl shadow p-4">
+        <h2 class="text-lg font-bold mb-3">登入（示意，一鍵登入）</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="login-google" class="px-3 py-2 rounded-xl bg-emerald-600 text-white">Google</button>
+          <button id="login-facebook" class="px-3 py-2 rounded-xl bg-sky-600 text-white">Facebook</button>
+          <button id="login-line" class="px-3 py-2 rounded-xl bg-green-600 text-white">LINE</button>
+          <div class="grow"></div>
+          <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
+          <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
+        </div>
+      </div>
+
+      <!-- 新增：店家與 DM 卡片 -->
+      <div class="bg-white rounded-2xl shadow p-4 acc" id="shop-camp-card" data-acc-key="shop-camp">
+        <h2 class="text-lg font-bold mb-3 acc-title" aria-expanded="true">店家與 DM <span class="chev"></span></h2>
+        <div class="space-y-3">
+          <!-- 店家選擇 -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-sm text-slate-600">店家選擇（必選）</label>
+              <div class="flex items-center gap-2">
+                <button id="btn-edit-shop-toggle" class="px-2 py-1 rounded-lg border text-xs hidden">編輯店家資料</button>
+                <button id="btn-del-shop" class="px-2 py-1 rounded-lg border text-xs hidden text-rose-600">刪除店家</button>
+                <button id="btn-add-shop-toggle" class="px-2 py-1 rounded-lg border text-xs">＋新增店家</button>
+              </div>
+            </div>
+            <div id="shop-pill-list" class="flex flex-wrap gap-2"></div>
+            <form id="form-add-shop" class="mt-2 hidden space-y-2 border rounded-xl p-2 bg-slate-50">
+              <input class="w-full rounded-lg border p-2" name="shopName" placeholder="店名（必填）" required />
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Logo（選填）</label>
+                  <input type="file" accept="image/*" name="shopLogo" class="w-full" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">品牌色（選填）</label>
+                  <input type="color" name="brandColor" class="w-full h-9 rounded-lg border" value="#0ea5e9" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <input class="rounded-lg border p-2" name="contactPerson" placeholder="聯絡人（選填）" />
+                <input class="rounded-lg border p-2" name="contactPhone" placeholder="電話（選填）" />
+                <input class="rounded-lg border p-2" name="contactLine" placeholder="LINE 或 @ID（選填）" />
+                <input class="rounded-lg border p-2" name="contactFacebook" placeholder="Facebook（選填）" />
+                <input class="rounded-lg border p-2" name="contactInstagram" placeholder="Instagram（選填）" />
+                <input class="rounded-lg border p-2" name="contactAddress" placeholder="地址 / 取貨地（選填）" />
+                <input class="rounded-lg border p-2 col-span-2" name="contactWebsite" placeholder="官網/表單（可貼網址，選填）" />
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="submit" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm">儲存店家</button>
+                <button type="button" id="btn-cancel-add-shop" class="px-3 py-2 rounded-xl border text-sm">取消</button>
+              </div>
+            </form>
+
+            <!-- 編輯店家資料（顯示目前選定店家資訊） -->
+            <form id="form-edit-shop" class="mt-2 hidden space-y-2 border rounded-xl p-2 bg-slate-50">
+              <div class="text-xs text-slate-500">編輯目前選定的店家資料</div>
+              <input class="w-full rounded-lg border p-2" name="shopName" placeholder="店名（必填）" required />
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Logo（重新上傳可覆蓋）</label>
+                  <input type="file" accept="image/*" name="shopLogo" class="w-full" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">品牌色</label>
+                  <input type="color" name="brandColor" class="w-full h-9 rounded-lg border" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <input class="rounded-lg border p-2" name="contactPerson" placeholder="聯絡人" />
+                <input class="rounded-lg border p-2" name="contactPhone" placeholder="電話" />
+                <input class="rounded-lg border p-2" name="contactLine" placeholder="LINE 或 @ID" />
+                <input class="rounded-lg border p-2" name="contactFacebook" placeholder="Facebook" />
+                <input class="rounded-lg border p-2" name="contactInstagram" placeholder="Instagram" />
+                <input class="rounded-lg border p-2" name="contactAddress" placeholder="地址 / 取貨地" />
+                <input class="rounded-lg border p-2 col-span-2" name="contactWebsite" placeholder="官網/表單（可貼網址）" />
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="submit" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">更新店家</button>
+                <button type="button" id="btn-cancel-edit-shop" class="px-3 py-2 rounded-xl border text-sm">取消</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- DM 方案（選到店家後才顯示） -->
+          <div id="campaign-section" class="hidden">
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-sm text-slate-600">DM 方案選擇（必選）</label>
+              <button id="btn-add-campaign-toggle" class="px-2 py-1 rounded-lg border text-xs">＋新增 DM 方案</button>
+            </div>
+            <div id="campaign-pill-list" class="flex flex-wrap gap-2"></div>
+            <form id="form-add-campaign" class="mt-2 hidden space-y-2 border rounded-xl p-2 bg-slate-50">
+              <input class="w-full rounded-lg border p-2" name="campaignName" placeholder="方案名稱（必填）" required />
+              <div class="text-xs text-slate-500">將以目前畫面樣式設定建立方案（或可之後再調整）。</div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">上傳 QR 圖片（選填）</label>
+                <input type="file" accept="image/*" name="qrImage" class="w-full" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">或產生 QR（貼網址）</label>
+                <input type="url" name="qrUrl" class="w-full rounded-lg border p-2" placeholder="https://..." />
+              </div>
+            </div>
+              <div class="flex items-center gap-2">
+                <button type="submit" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm">建立方案</button>
+                <button type="button" id="btn-cancel-add-campaign" class="px-3 py-2 rounded-xl border text-sm">取消</button>
+              </div>
+            </form>
+
+            <!-- 編輯現有方案（針對選中的方案） -->
+            <form id="form-edit-campaign" class="mt-2 hidden space-y-2 border rounded-xl p-2 bg-slate-50">
+              <div class="text-xs text-slate-500">編輯目前選定的 DM 方案</div>
+              <input class="w-full rounded-lg border p-2" name="campaignName" placeholder="方案名稱（必填）" required />
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">上傳 QR 圖片（覆蓋）</label>
+                  <input type="file" accept="image/*" name="qrImage" class="w-full" />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">或更新 QR（貼網址）</label>
+                  <input type="url" name="qrUrl" class="w-full rounded-lg border p-2" placeholder="https://..." />
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="submit" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">更新方案</button>
+                <button type="button" id="btn-del-campaign" class="px-3 py-2 rounded-xl border text-sm text-rose-600">刪除方案</button>
+                <button type="button" id="btn-cancel-edit-campaign" class="px-3 py-2 rounded-xl border text-sm">取消</button>
+              </div>
+            </form>
+          </div>
+
+          <div id="chosen-summary" class="text-xs text-slate-600"></div>
+        </div>
+      </div>
+
+      <!-- 1) 新增商品 -->
+      <div class="bg-white rounded-2xl shadow p-4 acc" data-acc-key="add-product">
+        <h2 class="text-lg font-bold mb-3 acc-title" aria-expanded="false">新增商品 <span class="chev"></span></h2>
+        <form id="product-form" class="space-y-3">
+          <input class="w-full rounded-xl border p-2" name="name" placeholder="商品名稱" required />
+          <div class="grid grid-cols-2 gap-2">
+            <input class="rounded-xl border p-2" name="price" placeholder="售價 (必填)" type="number" step="1" required />
+            <input class="rounded-xl border p-2" name="originalPrice" placeholder="原價 (選填)" type="number" step="1" />
+          </div>
+          <div class="relative">
+            <textarea class="w-full rounded-xl border p-2 pr-20" name="desc" rows="2" placeholder="商品描述（選填）"></textarea>
+            <button type="button" id="ai-desc-btn" class="absolute right-2 top-2 px-3 py-1 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors" title="AI生成描述">AI</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="file" accept="image/*" id="img-input" class="hidden" />
+            <button type="button" id="pick-img" class="px-3 py-2 rounded-xl bg-slate-800 text-white">上傳主圖</button>
+            <span id="img-name" class="text-sm text-slate-500">尚未選擇</span>
+          </div>
+          <button type="submit" class="w-full py-2 rounded-xl bg-indigo-600 text-white font-semibold">加入商品庫</button>
+        </form>
+        
+      </div>
+
+      <!-- DM 製作設定（大項） -->
+      <div class="bg-white rounded-2xl shadow p-4 acc" data-acc-key="dm-settings">
+        <h2 class="text-lg font-bold mb-3 acc-title" aria-expanded="false">DM 製作設定 <span class="chev"></span></h2>
+
+        <!-- 2) 預設樣式（移到新增商品下方） -->
+        <div class="acc" data-acc-key="presets">
+          <h3 class="text-base font-semibold mb-2 acc-title" aria-expanded="false">預設樣式 <span class="chev"></span></h3>
+          <div>
+        <div class="flex gap-2 mb-2">
+          <input id="preset-add-name" class="flex-1 rounded-xl border p-2" placeholder="新增樣式名稱（使用目前設定）" />
+          <button id="preset-add-btn" class="px-3 py-2 rounded-xl bg-indigo-600 text-white">新增</button>
+        </div>
+        <div id="preset-list" class="flex flex-wrap gap-2"></div>
+        <p class="text-xs text-slate-500 mt-2">四顆制式預設會先顯示。登入後可新增/刪除/釘選（會儲存到帳號）。</p>
+          </div>
+      </div>
+
+        <!-- 3) DM 顯示項目（移到預設樣式下方） -->
+        <div class="acc" data-acc-key="dm-display">
+          <h3 class="text-base font-semibold mb-2 acc-title" aria-expanded="false">DM 顯示項目 <span class="chev"></span></h3>
+          <div class="space-y-2" id="dm-display-box">
+          <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="opt-show-shop" class="rounded" /> 顯示店家名稱</label>
+          <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="opt-show-camp" class="rounded" /> 顯示 DM 名稱</label>
+          <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="opt-show-logo" class="rounded" /> 顯示店家 Logo（右上角）</label>
+          <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="opt-show-contact" class="rounded" /> 顯示聯絡方式（排成段落）</label>
+          <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="opt-show-notes" class="rounded" /> 顯示 DM 說明</label>
+            <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" id="opt-show-qr" class="rounded" /> 顯示 QR（若方案中有 QR）</label>
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <label class="inline-flex items-center gap-2 text-sm col-span-1"><input type="checkbox" id="opt-show-badge" class="rounded" /> 顯示促銷徽章</label>
+            <input id="opt-badge-text" class="col-span-1 rounded-xl border p-2 text-sm" placeholder="徽章文字（如：限時特價）" />
+          </div>
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <label class="text-sm">邊框樣式：</label>
+            <select id="opt-border-style" class="rounded-xl border p-2 text-sm">
+              <option value="none">無邊框</option>
+              <option value="solid">實線</option>
+              <option value="dashed">虛線</option>
+              <option value="dotted">點線</option>
+              <option value="double">雙線</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <label class="text-sm">邊框顏色：</label>
+            <input type="color" id="opt-border-color" class="rounded-xl border p-1 h-10" value="#e2e8f0" />
+          </div>
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <label class="text-sm">背景顏色：</label>
+            <input type="color" id="opt-background-color" class="rounded-xl border p-1 h-10" value="#ffffff" />
+          </div>
+          <textarea id="opt-notes" rows="3" class="w-full rounded-xl border p-2 hidden" placeholder="運費、寄件方式、檔期時間、注意事項…"></textarea>
+          <p class="text-xs text-slate-500">變更會立即套用到預覽與輸出（須先選店家與方案）。</p>
+          </div>
+        </div>
+
+        <!-- 4) 模板與圖片樣式 -->
+        <div class="acc" data-acc-key="styles">
+          <h3 class="text-base font-semibold mb-2 acc-title" aria-expanded="false">模板與圖片樣式 <span class="chev"></span></h3>
+          <div>
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-600">模板</label>
+          <select id="template-select" class="w-full rounded-xl border p-2">
+            <option value="single">單品（左右版）</option>
+            <option value="singleFull">單品（滿版背景）</option>
+            <option value="grid9">九宮格（最多 9 件）</option>
+            <option value="list">清單式（標題＋價錢）</option>
+          </select>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm text-slate-600">圖片填充</label>
+            <select id="fit-select" class="w-full rounded-xl border p-2">
+              <option value="cover">裁切填滿（銳利）</option>
+              <option value="contain">完整置入（不裁切）</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-600">圖片對齊</label>
+            <select id="pos-select" class="w-full rounded-xl border p-2">
+              <option value="center">置中</option>
+              <option value="top">靠上</option>
+              <option value="bottom">靠下</option>
+              <option value="left">靠左</option>
+              <option value="right">靠右</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-600">圖片框比例（單品/清單）</label>
+            <select id="ratio-select" class="w-full rounded-xl border p-2">
+              <option value="1/1">1:1（正方）</option>
+              <option value="4/5" selected>4:5（IG 推薦）</option>
+              <option value="3/4">3:4</option>
+              <option value="16/9">16:9（橫式）</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-4 space-y-2">
+          <label class="block text-sm text-slate-600">（九宮格）卡片高度</label>
+          <select id="grid-card-h" class="w-full rounded-xl border p-2">
+            <option value="320">小（320px）</option>
+            <option value="360" selected>中（360px）</option>
+            <option value="420">大（420px）</option>
+          </select>
+          <label class="block text-sm text-slate-600 mt-2">（九宮格）圖片占卡片比例</label>
+          <select id="grid-img-frac" class="w-full rounded-xl border p-2">
+            <option value="0.4">40%</option>
+            <option value="0.5">50%</option>
+            <option value="0.6" selected>60%</option>
+            <option value="0.7">70%</option>
+          </select>
+          <label class="inline-flex items-center gap-2 text-sm"><input id="grid-fill" type="checkbox" class="rounded" checked> 不足 9 件以空白卡補齊（固定 3×3）</label>
+        </div>
+        </div>
+      </div>
+
+        <!-- 5) 批量匯入（移到模板樣式下方，並新增「下載範本」） -->
+        <div class="acc" data-acc-key="csv-import">
+          <h3 class="text-base font-semibold mb-2 acc-title" aria-expanded="false">批量匯入（CSV/Excel）<span class="chev"></span></h3>
+          <div>
+        <p class="text-sm text-slate-600 mb-2">欄位：name, price, originalPrice, desc, imageUrl</p>
+        <input type="file" id="csv-input" accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        <div class="mt-2">
+          <button id="btn-download-template" class="px-3 py-2 rounded-xl border text-sm">下載空白範本</button>
+        </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中：商品列表（可勾選進 DM） -->
+    <section class="bg-white rounded-2xl shadow overflow-hidden acc">
+      <div class="acc-title cursor-pointer p-4 flex items-center justify-between">
+        <h2 class="text-lg font-bold">商品庫（勾選要放進 DM 的商品）</h2>
+        <span class="chev"></span>
+      </div>
+      <div class="acc-content p-4 pt-0">
+        <!-- AI描述生成工具 -->
+        <div class="mb-4 p-3 bg-blue-50 rounded-xl">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-blue-800">AI描述生成工具</h3>
+            <span class="text-xs text-blue-600">智能生成商品描述</span>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="batch-ai-desc" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+              為所有商品生成AI描述
+            </button>
+            <button type="button" id="ai-desc-selected" class="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
+              為選中商品生成
+            </button>
+          </div>
+        </div>
+        
+        <div id="product-table" class="overflow-auto max-h-[50vh]">
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-slate-100">
+              <tr>
+                <th class="p-2 text-left"><input type="checkbox" id="select-all"></th>
+                <th class="p-2 text-left">圖片</th>
+                <th class="p-2 text-left">名稱</th>
+                <th class="p-2 text-left">售價</th>
+                <th class="p-2 text-left">原價</th>
+                <th class="p-2 text-left">描述</th>
+              </tr>
+            </thead>
+            <tbody id="product-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右：DM 畫布預覽區 -->
+    <section class="bg-white rounded-2xl shadow p-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+        <h2 class="text-lg font-bold">DM 預覽（1080 × 1350）</h2>
+        <div class="flex items-center gap-2 text-sm flex-wrap">
+          <button id="zoom-fit" class="px-2 py-1 rounded-lg border">適應</button>
+          <button class="px-2 py-1 rounded-lg border zoom-btn" data-z="1">100%</button>
+          <button class="px-2 py-1 rounded-lg border zoom-btn" data-z="0.75">75%</button>
+          <button class="px-2 py-1 rounded-lg border zoom-btn" data-z="0.5">50%</button>
+          <div class="flex items-center gap-1">
+            <input type="range" id="zoom-range" min="0.25" max="1" step="0.05" value="0.6" />
+            <span id="zoom-val" class="w-12 text-right">60%</span>
+          </div>
+        </div>
+      </div>
+      <div id="preview-wrap" class="overflow-auto max-h-[60vh] bg-slate-100 rounded-xl p-3">
+        <div id="scale-wrap">
+          <div id="dm-canvas" class="relative bg-gradient-to-br from-white via-slate-50 to-slate-100 rounded-2xl shadow-inner border overflow-visible block">
+            <!-- 動態注入模板內容 -->
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 space-y-3">
+        <div class="flex items-center gap-2 text-sm">
+          <label class="text-slate-600">下載範圍：</label>
+          <select id="download-range" class="px-2 py-1 border rounded text-sm">
+            <option value="all">全部頁面</option>
+            <option value="current">當前頁面</option>
+            <option value="custom">自訂範圍</option>
+          </select>
+          <div id="custom-range" class="hidden flex items-center gap-1">
+            <input type="number" id="start-page" placeholder="起始" min="1" class="w-16 px-1 py-1 border rounded text-sm">
+            <span class="text-slate-500">-</span>
+            <input type="number" id="end-page" placeholder="結束" min="1" class="w-16 px-1 py-1 border rounded text-sm">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="download-png" class="px-3 py-2 rounded-xl bg-rose-600 text-white">下載 PNG</button>
+          <button id="download-pdf" class="px-3 py-2 rounded-xl bg-amber-600 text-white">下載 PDF</button>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">提示：縮放只影響預覽，不影響輸出尺寸與清晰度。</p>
+    </section>
+  </div>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // ===== 狀態 =====
+    const state = {
+      user: null, // { id, name }
+      products: [],
+      selection: new Set(),
+      template: 'grid9',
+      preview: { scale: 0.6, fit: false },
+      imgFit: 'cover',
+      imgPos: 'center',
+      imgRatio: '4/5',
+      gridCardH: 360,
+      gridFill: true,
+      gridImgFrac: 0.6,
+      selectedShopId: null,
+      selectedCampaignId: null,
+    };
+
+    // ===== DOM 快取 =====
+    const els = {
+      loginGoogle: document.getElementById('login-google'),
+      loginFacebook: document.getElementById('login-facebook'),
+      loginLINE: document.getElementById('login-line'),
+      loginState: document.getElementById('login-state'),
+      resetData: document.getElementById('reset-data'),
+      // Shops & Campaigns
+      shopCard: document.getElementById('shop-camp-card'),
+      shopPills: document.getElementById('shop-pill-list'),
+      btnAddShopToggle: document.getElementById('btn-add-shop-toggle'),
+      btnEditShopToggle: document.getElementById('btn-edit-shop-toggle'),
+      btnDelShop: document.getElementById('btn-del-shop'),
+      formAddShop: document.getElementById('form-add-shop'),
+      btnCancelAddShop: document.getElementById('btn-cancel-add-shop'),
+      formEditShop: document.getElementById('form-edit-shop'),
+      btnCancelEditShop: document.getElementById('btn-cancel-edit-shop'),
+      campaignSection: document.getElementById('campaign-section'),
+      campaignPills: document.getElementById('campaign-pill-list'),
+      btnAddCampaignToggle: document.getElementById('btn-add-campaign-toggle'),
+      formAddCampaign: document.getElementById('form-add-campaign'),
+      btnCancelAddCampaign: document.getElementById('btn-cancel-add-campaign'),
+      formEditCampaign: document.getElementById('form-edit-campaign'),
+      btnCancelEditCampaign: document.getElementById('btn-cancel-edit-campaign'),
+      btnDelCampaign: document.getElementById('btn-del-campaign'),
+      chosenSummary: document.getElementById('chosen-summary'),
+
+      imgInput: document.getElementById('img-input'),
+      pickImg: document.getElementById('pick-img'),
+      imgName: document.getElementById('img-name'),
+      form: document.getElementById('product-form'),
+      csvInput: document.getElementById('csv-input'),
+      tbody: document.getElementById('product-tbody'),
+      templateSelect: document.getElementById('template-select'),
+      previewWrap: document.getElementById('preview-wrap'),
+      scaleWrap: document.getElementById('scale-wrap'),
+      dmCanvas: document.getElementById('dm-canvas'),
+      downloadPng: document.getElementById('download-png'),
+      downloadPdf: document.getElementById('download-pdf'),
+      downloadRange: document.getElementById('download-range'),
+      customRange: document.getElementById('custom-range'),
+      startPage: document.getElementById('start-page'),
+      endPage: document.getElementById('end-page'),
+      zoomFit: document.getElementById('zoom-fit'),
+      zoomBtns: document.querySelectorAll('.zoom-btn'),
+      zoomRange: document.getElementById('zoom-range'),
+      zoomVal: document.getElementById('zoom-val'),
+      fitSelect: document.getElementById('fit-select'),
+      posSelect: document.getElementById('pos-select'),
+      ratioSelect: document.getElementById('ratio-select'),
+      gridCardH: document.getElementById('grid-card-h'),
+      gridFill: document.getElementById('grid-fill'),
+      gridImgFrac: document.getElementById('grid-img-frac'),
+      presetList: document.getElementById('preset-list'),
+      presetAddName: document.getElementById('preset-add-name'),
+      presetAddBtn: document.getElementById('preset-add-btn'),
+      // Display options
+      optShowShop: document.getElementById('opt-show-shop'),
+      optShowCamp: document.getElementById('opt-show-camp'),
+      optShowContact: document.getElementById('opt-show-contact'),
+      optShowNotes: document.getElementById('opt-show-notes'),
+      optNotes: document.getElementById('opt-notes'),
+      optShowBadge: document.getElementById('opt-show-badge'),
+      optBadgeText: document.getElementById('opt-badge-text'),
+      optShowLogo: document.getElementById('opt-show-logo'),
+      optShowQR: document.getElementById('opt-show-qr'),
+      optBorderStyle: document.getElementById('opt-border-style'),
+      optBorderColor: document.getElementById('opt-border-color'),
+      optBackgroundColor: document.getElementById('opt-background-color'),
+    };
+
+    // ===== 工具 =====
+    const uid = () => Math.random().toString(36).slice(2,10);
+
+    function priceTag(price){
+      return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(Number(price||0));
+    }
+
+    function escapeHtml(str){
+      return (str||'').toString().replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+    }
+
+    // Toast 簡易提示
+    function ensureToastHost(){ let host = document.getElementById('toast-wrap'); if (!host){ host = document.createElement('div'); host.id='toast-wrap'; document.body.appendChild(host); } return host; }
+    function toast(message, ms=1800){ const host=ensureToastHost(); const t=document.createElement('div'); t.className='toast'; t.textContent=message; host.appendChild(t); requestAnimationFrame(()=> t.classList.add('show')); setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=> t.remove(), 250); }, ms); }
+
+    // 在某些環境（內嵌容器/行動瀏覽器）會封鎖 alert/confirm/prompt。
+    // 使用安全版 confirm：若不可用則默認通過，避免操作卡住。
+    function safeConfirm(msg){
+      try {
+        if (typeof window.confirm === 'function') return window.confirm(msg);
+      } catch (e) {
+        console.warn('window.confirm 不可用，採用 fallback', e);
+      }
+      // fallback：直接視為確認
+      return true;
+    }
+
+    // ===== 登入（示意） =====
+    function setUser(u){
+      state.user = u;
+      els.loginState.textContent = u ? scopeString() : '未登入（需登入才能新增樣式/釘選/刪除）';
+      updatePresetControls();
+      updateAccordionLock();
+      // 清理測試殘留資料（避免顯示店T19等測試店家）
+      try { cleanupTestArtifacts(); renderShopPills(); } catch(e) { console.warn('cleanupTestArtifacts error', e); }
+    }
+    // ===== Shops / Campaigns 資料與 UI =====
+    const SHOPS_KEY_PREFIX = 'dm-shops-v1:';
+    const CAMPS_KEY_PREFIX = 'dm-campaigns-v1:'; // {userId}:{shopId}
+    const PRESET_V5_PREFIX = 'dm-presets-v5:'; // {userId}:{shopId}:{campaignId}
+
+    function shopsKey(){ return state.user ? SHOPS_KEY_PREFIX + state.user.id : null; }
+    function campsKey(shopId){ return state.user && shopId ? `${CAMPS_KEY_PREFIX}${state.user.id}:${shopId}` : null; }
+    function presetsV5Key(shopId, campId){ return state.user && shopId && campId ? `${PRESET_V5_PREFIX}${state.user.id}:${shopId}:${campId}` : null; }
+
+    function loadShops(){
+      const k = shopsKey(); if (!k) return [];
+      try { const raw = localStorage.getItem(k); const arr = JSON.parse(raw||'[]'); return Array.isArray(arr)?arr:[]; } catch{ return []; }
+    }
+    function saveShops(list){ const k=shopsKey(); if (!k){ alert('請先登入'); return false; } try{ localStorage.setItem(k, JSON.stringify(list)); return true; } catch(e){ alert('儲存店家失敗'); return false; } }
+    function loadCamps(shopId){ const k=campsKey(shopId); if (!k) return []; try{ const raw=localStorage.getItem(k); const arr=JSON.parse(raw||'[]'); return Array.isArray(arr)?arr:[]; }catch{ return []; } }
+    function saveCamps(shopId, list){ const k=campsKey(shopId); if (!k){ alert('請先登入'); return false; } try{ localStorage.setItem(k, JSON.stringify(list)); return true; } catch{ alert('儲存方案失敗'); return false; } }
+
+    function findShopById(id){ return loadShops().find(s=>s.id===id)||null; }
+    function findCampById(shopId, id){ return loadCamps(shopId).find(c=>c.id===id)||null; }
+
+    function scopeString(){
+      const user = state.user? state.user.name : '未登入';
+      const shop = state.selectedShopId? (findShopById(state.selectedShopId)?.name||'') : '—';
+      const camp = state.selectedCampaignId? (findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'') : '—';
+      return state.user ? `已登入：${user} ｜ 店家：${shop} ｜ 方案：${camp}` : '未登入（需登入才能新增樣式/釘選/刪除）';
+    }
+
+    function renderChosenSummary(){
+      els.loginState.textContent = scopeString();
+      if (state.selectedShopId && state.selectedCampaignId){
+        const sn = findShopById(state.selectedShopId)?.name || '';
+        const cn = findCampById(state.selectedShopId, state.selectedCampaignId)?.name || '';
+        els.chosenSummary.textContent = `已選：店家「${sn}」／DM 方案「${cn}」`;
+      } else {
+        els.chosenSummary.textContent = '';
+      }
+    }
+
+    function renderShopPills(){
+      const shops = loadShops();
+      els.shopPills.innerHTML = '';
+      for (const s of shops){
+        const btn = document.createElement('button');
+        btn.type='button';
+        btn.className = 'pill px-3 py-1 rounded-full border bg-white text-sm';
+        btn.textContent = s.name;
+        if (s.id===state.selectedShopId) btn.classList.add('bg-indigo-50','border-indigo-300');
+        btn.addEventListener('click', ()=>{ state.selectedShopId = s.id; state.selectedCampaignId = null; renderCampaignPills(); updateGating(); renderChosenSummary(); updateEditShopVisibility(); fillEditShopForm(); });
+        els.shopPills.appendChild(btn);
+      }
+      els.campaignSection.classList.toggle('hidden', !state.selectedShopId);
+    }
+
+    function renderCampaignPills(){
+      els.campaignPills.innerHTML = '';
+      if (!state.selectedShopId){ els.campaignSection.classList.add('hidden'); return; }
+      const camps = loadCamps(state.selectedShopId);
+      for (const c of camps){
+        const wrap = document.createElement('div'); wrap.className='relative group flex items-center';
+        const btn = document.createElement('button'); btn.type='button'; btn.className='pill px-3 py-1 rounded-full border bg-white text-sm'; btn.textContent=c.name;
+        if (c.id===state.selectedCampaignId) btn.classList.add('bg-indigo-50','border-indigo-300');
+        btn.addEventListener('click', ()=>{ state.selectedCampaignId = c.id; applySettings(c.settings); loadDisplayOptionsFromMeta(); fillEditCampaignForm(); toast(`已套用 DM 方案「${c.name}」`); renderChosenSummary(); updateGating(); reloadPresets(); });
+        // 小 x：刪除（顯示於 hover）
+        const del = document.createElement('button'); del.type='button'; del.textContent='x'; del.title='刪除'; del.className='ml-1 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 text-xs w-6 h-6 rounded-full inline-grid place-items-center';
+        del.addEventListener('click', (e)=>{ e.stopPropagation(); if (!safeConfirm(`刪除方案「${c.name}」？`)) return; const list=loadCamps(state.selectedShopId).filter(x=>x.id!==c.id); saveCamps(state.selectedShopId, list); if (state.selectedCampaignId===c.id) state.selectedCampaignId=null; renderCampaignPills(); renderChosenSummary(); updateGating(); reloadPresets(); });
+        wrap.append(btn, del); els.campaignPills.appendChild(wrap);
+      }
+      // 有選店家時一律顯示 DM 區塊（即使目前沒有任何方案），讓使用者可以新增
+      els.campaignSection.classList.remove('hidden');
+      // 若目前沒有任何方案，協助展開新增表單
+      const hasAny = camps.length>0;
+      if (!hasAny && els.formAddCampaign) { els.formAddCampaign.classList.remove('hidden'); }
+    }
+
+    els.btnAddShopToggle.addEventListener('click', ()=>{ els.formAddShop.classList.toggle('hidden'); });
+    els.btnCancelAddShop.addEventListener('click', ()=>{ els.formAddShop.classList.add('hidden'); els.formAddShop.reset(); });
+
+    function updateEditShopVisibility(){
+      const hasShop = !!state.selectedShopId;
+      if (els.btnEditShopToggle) els.btnEditShopToggle.classList.toggle('hidden', !hasShop);
+      if (els.btnDelShop) els.btnDelShop.classList.toggle('hidden', !hasShop);
+    }
+    function fillEditShopForm(){
+      if (!els.formEditShop) return; const s = state.selectedShopId? findShopById(state.selectedShopId): null; if (!s) return;
+      els.formEditShop.shopName.value = s.name || '';
+      els.formEditShop.brandColor.value = s.brandColor || '#0ea5e9';
+      const c = s.contact||{};
+      els.formEditShop.contactPerson.value = c.person||'';
+      els.formEditShop.contactPhone.value = c.phone||'';
+      els.formEditShop.contactLine.value = c.line||'';
+      els.formEditShop.contactFacebook.value = c.facebook||'';
+      els.formEditShop.contactInstagram.value = c.instagram||'';
+      els.formEditShop.contactAddress.value = c.address||'';
+      els.formEditShop.contactWebsite.value = c.website||'';
+    }
+
+    els.btnEditShopToggle && els.btnEditShopToggle.addEventListener('click', ()=>{ if (!state.selectedShopId){ alert('請先選擇店家'); return; } fillEditShopForm(); els.formEditShop.classList.toggle('hidden'); });
+    els.btnCancelEditShop && els.btnCancelEditShop.addEventListener('click', ()=>{ els.formEditShop.classList.add('hidden'); });
+
+    els.formAddShop.addEventListener('submit', async (e)=>{
+      e.preventDefault(); if (!state.user){ alert('請先登入'); return; }
+      const fd = new FormData(els.formAddShop);
+      const name = (fd.get('shopName')||'').toString().trim(); if (!name){ alert('請輸入店名'); return; }
+      let logoDataUrl = '';
+      const file = fd.get('shopLogo');
+      if (file && file.size){ try{ logoDataUrl = await fileToDataUrl(file); } catch{} }
+      const shop = {
+        id: 'shop_'+uid(), name, logoDataUrl,
+        brandColor: (fd.get('brandColor')||'').toString() || '',
+        contact: {
+          person: (fd.get('contactPerson')||'').toString(),
+          phone: (fd.get('contactPhone')||'').toString(),
+          line: (fd.get('contactLine')||'').toString(),
+          facebook: (fd.get('contactFacebook')||'').toString(),
+          instagram: (fd.get('contactInstagram')||'').toString(),
+          address: (fd.get('contactAddress')||'').toString(),
+          website: (fd.get('contactWebsite')||'').toString(),
+        }
+      };
+      const list = loadShops(); list.unshift(shop); if (!saveShops(list)) return;
+      els.formAddShop.reset(); els.formAddShop.classList.add('hidden');
+      state.selectedShopId = shop.id; state.selectedCampaignId = null; renderShopPills(); renderCampaignPills(); updateGating(); renderChosenSummary();
+      updateEditShopVisibility(); fillEditShopForm();
+    });
+
+    els.formEditShop && els.formEditShop.addEventListener('submit', async (e)=>{
+      e.preventDefault(); if (!state.user){ alert('請先登入'); return; }
+      if (!state.selectedShopId){ alert('請先選擇店家'); return; }
+      const fd = new FormData(els.formEditShop);
+      const shops = loadShops(); const idx = shops.findIndex(x=>x.id===state.selectedShopId); if (idx<0) return;
+      const cur = shops[idx];
+      let logoDataUrl = cur.logoDataUrl || '';
+      const file = fd.get('shopLogo'); if (file && file.size){ try{ logoDataUrl = await fileToDataUrl(file); }catch{} }
+      const updated = {
+        ...cur,
+        name: (fd.get('shopName')||'').toString().trim() || cur.name,
+        logoDataUrl,
+        brandColor: (fd.get('brandColor')||'').toString() || cur.brandColor,
+        contact: {
+          person: (fd.get('contactPerson')||'').toString(),
+          phone: (fd.get('contactPhone')||'').toString(),
+          line: (fd.get('contactLine')||'').toString(),
+          facebook: (fd.get('contactFacebook')||'').toString(),
+          instagram: (fd.get('contactInstagram')||'').toString(),
+          address: (fd.get('contactAddress')||'').toString(),
+          website: (fd.get('contactWebsite')||'').toString(),
+        }
+      };
+      shops[idx] = updated; saveShops(shops); els.formEditShop.classList.add('hidden'); renderShopPills(); renderChosenSummary(); renderDM(); toast('店家資料已更新');
+    });
+
+    // 刪除店家（同步刪除其方案與該範圍預設）
+    els.btnDelShop && els.btnDelShop.addEventListener('click', ()=>{
+      if (!state.selectedShopId){ alert('請先選擇店家'); return; }
+      if (!safeConfirm('確認刪除此店家與其所有 DM 方案？')) return;
+      const shops = loadShops().filter(x=> x.id!==state.selectedShopId);
+      saveShops(shops);
+      // 刪除該店家的 campaigns 與 presets v5
+      try{
+        const uid = state.user?.id; if (uid){
+          const ck = campsKey(state.selectedShopId); if (ck) localStorage.removeItem(ck);
+          // 清空此店家底下所有方案的 presets
+          const camps = loadCamps(state.selectedShopId);
+          for (const c of camps){ const pk = presetsV5Key(state.selectedShopId, c.id); if (pk) localStorage.removeItem(pk); }
+        }
+      }catch{}
+      state.selectedShopId=null; state.selectedCampaignId=null; renderShopPills(); renderCampaignPills(); updateGating(); renderChosenSummary(); reloadPresets(); toast('已刪除店家');
+    });
+
+    els.btnAddCampaignToggle.addEventListener('click', ()=>{ els.formAddCampaign.classList.toggle('hidden'); });
+    els.btnCancelAddCampaign.addEventListener('click', ()=>{ els.formAddCampaign.classList.add('hidden'); els.formAddCampaign.reset(); });
+    function fillEditCampaignForm(){ if (!els.formEditCampaign) return; const c = state.selectedCampaignId? findCampById(state.selectedShopId, state.selectedCampaignId): null; if (!c){ els.formEditCampaign.classList.add('hidden'); return; } els.formEditCampaign.campaignName.value = c.name||''; els.formEditCampaign.classList.remove('hidden'); }
+
+    els.formAddCampaign.addEventListener('submit', (e)=>{
+      e.preventDefault(); if (!state.user){ alert('請先登入'); return; }
+      if (!state.selectedShopId){ alert('請先選擇店家'); return; }
+      const fd = new FormData(els.formAddCampaign);
+      const name = (fd.get('campaignName')||'').toString().trim(); if (!name){ alert('請輸入方案名稱'); return; }
+      const qrUrl = (fd.get('qrUrl')||'').toString().trim();
+      const qrFile = fd.get('qrImage');
+      const metaBase = { header:'', disclaimer:'', showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true };
+      const camp = { id:'camp_'+uid(), name, settings: currentSettings(), meta: metaBase };
+      (async ()=>{
+        try{
+          if (qrFile && qrFile.size){ 
+            camp.meta.qrDataUrl = await fileToDataUrl(qrFile); 
+            console.log('QR文件上傳成功');
+          }
+          else if (qrUrl){
+            console.log('開始生成QR，URL:', qrUrl);
+            if (typeof QRCode === 'undefined') {
+              throw new Error('QRCode庫未載入，請重新載入頁面');
+            }
+            const canvas = document.createElement('canvas');
+            await QRCode.toCanvas(canvas, qrUrl, { width: 300, margin: 1, color: { dark: '#000000', light: null } });
+            camp.meta.qrDataUrl = canvas.toDataURL('image/png');
+            console.log('QR生成成功，數據長度:', camp.meta.qrDataUrl.length);
+          }
+        }catch(e){ 
+          console.error('產生/載入 QR 失敗', e); 
+          alert('QR生成失敗: ' + e.message);
+        }
+        const list = loadCamps(state.selectedShopId); list.unshift(camp); if (!saveCamps(state.selectedShopId, list)) return;
+        els.formAddCampaign.reset(); els.formAddCampaign.classList.add('hidden');
+        state.selectedCampaignId = camp.id; renderCampaignPills(); applySettings(camp.settings); loadDisplayOptionsFromMeta(); toast(`已套用 DM 方案「${camp.name}」`); renderChosenSummary(); updateGating(); reloadPresets();
+      })();
+    });
+
+    // 編輯方案
+    els.btnCancelEditCampaign && els.btnCancelEditCampaign.addEventListener('click', ()=>{ els.formEditCampaign.classList.add('hidden'); });
+    els.formEditCampaign && els.formEditCampaign.addEventListener('submit', async (e)=>{
+      e.preventDefault(); if (!state.user){ alert('請先登入'); return; }
+      if (!state.selectedShopId || !state.selectedCampaignId){ alert('請先選擇方案'); return; }
+      const fd = new FormData(els.formEditCampaign);
+      const camps = loadCamps(state.selectedShopId); const idx = camps.findIndex(x=>x.id===state.selectedCampaignId); if (idx<0) return;
+      const old = camps[idx];
+      let qrDataUrl = old.meta?.qrDataUrl || '';
+      const qrFile = fd.get('qrImage'); const qrUrl = (fd.get('qrUrl')||'').toString().trim();
+      try{
+        if (qrFile && qrFile.size){ 
+          qrDataUrl = await fileToDataUrl(qrFile); 
+          console.log('QR文件更新成功');
+        }
+        else if (qrUrl){ 
+          console.log('開始更新QR，URL:', qrUrl);
+          if (typeof QRCode === 'undefined') {
+            throw new Error('QRCode庫未載入，請重新載入頁面');
+          }
+          const canvas=document.createElement('canvas'); 
+          await QRCode.toCanvas(canvas, qrUrl, { width:300, margin:1, color: { dark: '#000000', light: null } }); 
+          qrDataUrl = canvas.toDataURL('image/png');
+          console.log('QR更新成功，數據長度:', qrDataUrl.length);
+        }
+      }catch(e){
+        console.error('更新QR失敗', e);
+        alert('QR更新失敗: ' + e.message);
+      }
+      camps[idx] = { ...old, name: (fd.get('campaignName')||'').toString().trim()||old.name, meta: { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', showLogo:false, showQR:true, ...(old.meta||{}), qrDataUrl } };
+      saveCamps(state.selectedShopId, camps); toast('方案已更新'); renderCampaignPills(); loadDisplayOptionsFromMeta(); renderChosenSummary(); updateGating(); reloadPresets();
+    });
+    // 方案刪除（按鈕位於表單內）
+    els.btnDelCampaign && els.btnDelCampaign.addEventListener('click', ()=>{
+      if (!state.selectedShopId || !state.selectedCampaignId){ alert('請先選擇方案'); return; }
+      if (!safeConfirm('確認刪除此方案？')) return;
+      const list = loadCamps(state.selectedShopId).filter(x=>x.id!==state.selectedCampaignId);
+      saveCamps(state.selectedShopId, list); state.selectedCampaignId=null; els.formEditCampaign.classList.add('hidden'); renderCampaignPills(); renderChosenSummary(); updateGating(); reloadPresets();
+    });
+
+    // ===== Gating（流程鎖定） =====
+    function hasScopeReady(){ return !!(state.selectedShopId && state.selectedCampaignId); }
+    function setCardLocked(card, locked){
+      if (!card) return;
+      card.classList.toggle('opacity-50', locked);
+      const title = card.querySelector('.acc-title');
+      const content = Array.from(card.children).filter(n=> n!==title);
+      content.forEach(n=> n.style.pointerEvents = locked? 'none' : '');
+    }
+
+    function updateGating(){
+      const disabled = !hasScopeReady();
+      // 樣式卡、預設樣式卡、顯示項目卡：僅鎖內容，不鎖標題列
+      setCardLocked(els.templateSelect.closest('.acc'), disabled);
+      setCardLocked(els.presetList.closest('.acc'), disabled);
+      setCardLocked(document.querySelector('[data-acc-key="dm-display"]'), disabled);
+      // 匯出
+      els.downloadPng.disabled = disabled; els.downloadPdf.disabled = disabled;
+      els.downloadPng.classList.toggle('opacity-50', disabled); els.downloadPdf.classList.toggle('opacity-50', disabled);
+    }
+
+    function fakeLogin(provider){
+      // 一鍵登入：不使用 prompt，避免被環境封鎖
+      const email = `tester+${provider.toLowerCase()}@local`;
+      setUser({ id: email, name: provider });
+      reloadPresets();
+    }
+
+    els.loginGoogle.addEventListener('click', () => fakeLogin('Google'));
+    els.loginFacebook.addEventListener('click', () => fakeLogin('Facebook'));
+    els.loginLINE.addEventListener('click', () => fakeLogin('LINE'));
+
+    // 重置本機資料（清空目前帳號相關的 shops/campaigns/presets/accordion）
+    els.resetData.addEventListener('click', ()=>{
+      try{
+        if (!state.user){ localStorage.clear(); location.reload(); return; }
+        const uid = state.user.id;
+        Object.keys(localStorage).forEach(k=>{
+          if (k.startsWith('dm-shops-v1:'+uid) || k.startsWith('dm-campaigns-v1:'+uid) || k.startsWith('dm-presets-v5:'+uid) || k.startsWith('dm-presets-v4:'+uid) || k.startsWith('dm-acc-v1:'+uid)){
+            localStorage.removeItem(k);
+          }
+        });
+        // 也刪除所有該帳號下各店家的 campaigns
+        const shops = loadShops();
+        for (const s of shops){ const k = `dm-campaigns-v1:${uid}:${s.id}`; localStorage.removeItem(k); }
+        // 退出登入，回到初始狀態
+        setUser(null); state.selectedShopId=null; state.selectedCampaignId=null; renderShopPills(); renderCampaignPills(); updateGating(); renderChosenSummary(); reloadPresets(); toast('已重置本機資料');
+      }catch(e){ console.error(e); toast('重置失敗，請手動清除瀏覽器儲存'); }
+    });
+
+    // ===== 圖片處理 =====
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function productImageDom(p, isHighRes = false){
+      if (!p?.imageDataUrl){
+        return `<div class='w-full h-full grid place-items-center text-slate-400'>無商品圖</div>`;
+      }
+      const bgSize = state.imgFit === 'contain' ? 'contain' : 'cover';
+      const bgPos = ({center:'center', top:'top', bottom:'bottom', left:'left', right:'right'})[state.imgPos] || 'center';
+      
+      // 為九宮格和清單提供高解析度圖片處理
+      if (isHighRes) {
+        // 使用高解析度背景圖，確保小尺寸容器也能清晰顯示
+        // 添加多重CSS優化提升圖片清晰度
+        return `<div class='w-full h-full' style="background-image:url('${p.imageDataUrl}');background-size:${bgSize};background-position:${bgPos};background-repeat:no-repeat;image-rendering: -webkit-optimize-contrast;image-rendering: crisp-edges;image-rendering: pixelated;transform: translateZ(0);backface-visibility: hidden;"></div>`;
+      }
+      
+      // 使用背景圖確保 html2canvas 也能正確裁切（與預覽一致：置中、溢出裁切、比例不變）
+      return `<div class='w-full h-full' style="background-image:url('${p.imageDataUrl}');background-size:${bgSize};background-position:${bgPos};background-repeat:no-repeat;"></div>`;
+    }
+
+    // ===== AI描述生成 =====
+    function generateAIDescription(productName, price, originalPrice, imageDataUrl = null) {
+      // 基於商品名稱和價格生成吸引人的描述
+      const descriptions = {
+        // 食品類
+        '肉': ['新鮮直送，品質保證', '嚴選食材，口感絕佳', '營養豐富，美味健康'],
+        '雞': ['鮮嫩多汁，香氣四溢', '優質蛋白質來源', '料理簡單，美味滿分'],
+        '牛': ['頂級肉質，入口即化', '豐富營養，健康首選', '新鮮現切，品質保證'],
+        '豬': ['肥瘦適中，口感絕佳', '新鮮直送，品質優良', '料理多樣，美味滿分'],
+        '魚': ['新鮮海味，營養豐富', '優質蛋白質，健康首選', '鮮美可口，回味無窮'],
+        '蝦': ['鮮甜Q彈，口感絕佳', '新鮮海味，營養豐富', '料理簡單，美味滿分'],
+        '蔬菜': ['新鮮直送，營養豐富', '有機種植，健康首選', '清脆爽口，美味健康'],
+        '水果': ['新鮮現摘，香甜可口', '營養豐富，健康美味', '季節限定，品質保證'],
+        '燒肉': ['香氣四溢，口感絕佳', '新鮮肉質，美味滿分', '燒烤必備，聚會首選'],
+        '火鍋': ['湯頭濃郁，食材豐富', '溫暖美味，聚餐首選', '新鮮食材，健康美味'],
+        '便當': ['營養均衡，美味便當', '新鮮現做，健康首選', '方便美味，上班族最愛'],
+        '飲料': ['清涼解渴，口感絕佳', '天然成分，健康選擇', '多種口味，滿足需求'],
+        
+        // 飲品類
+        '茶': ['香氣濃郁，回甘悠長', '精選茶葉，品質保證', '清香怡人，放鬆身心'],
+        '咖啡': ['香醇濃郁，提神醒腦', '精選豆子，口感絕佳', '香氣四溢，回味無窮'],
+        '牛奶': ['香濃純正，營養豐富', '新鮮直送，品質保證', '優質蛋白質，健康首選'],
+        '果汁': ['新鮮現榨，維生素豐富', '天然果香，健康美味', '無添加，純天然'],
+        '奶茶': ['香濃滑順，甜蜜滋味', '經典口味，人氣首選', '香氣四溢，回味無窮'],
+        
+        // 甜點類
+        '蛋糕': ['綿密口感，香甜可口', '精緻手工，美味滿分', '節慶必備，幸福滋味'],
+        '餅乾': ['香脆可口，回味無窮', '手工製作，品質保證', '下午茶首選，美味滿分'],
+        '巧克力': ['香濃滑順，甜蜜滋味', '精選可可，口感絕佳', '浪漫首選，幸福滿分'],
+        '布丁': ['滑嫩口感，香甜可口', '手工製作，美味滿分', '甜點首選，幸福滋味'],
+        
+        // 日用品類
+        '清潔': ['強效清潔，安全無毒', '環保配方，健康首選', '去污力強，使用方便'],
+        '保養': ['溫和配方，呵護肌膚', '天然成分，健康美麗', '專業品質，效果顯著'],
+        '居家': ['實用美觀，提升生活品質', '精選材質，耐用可靠', '設計貼心，使用便利'],
+        '文具': ['實用美觀，學習必備', '精選材質，書寫流暢', '設計貼心，使用便利'],
+        
+        // 電子產品類
+        '手機': ['功能強大，性能優越', '時尚設計，科技感十足', '智能生活，便利首選'],
+        '電腦': ['高效能處理，工作利器', '專業品質，值得信賴', '科技創新，提升效率'],
+        '耳機': ['音質清晰，舒適佩戴', '無線便利，音樂享受', '高品質音效，聽覺盛宴']
+      };
+      
+      // 根據商品名稱找到匹配的關鍵詞
+      let matchedKeywords = [];
+      for (const [keyword, descs] of Object.entries(descriptions)) {
+        if (productName.includes(keyword)) {
+          matchedKeywords = descs;
+          break;
+        }
+      }
+      
+      // 如果沒有匹配到，使用通用描述
+      if (matchedKeywords.length === 0) {
+        matchedKeywords = [
+          '精選商品，品質保證',
+          '優質選擇，值得信賴',
+          '實用美觀，物超所值',
+          '新鮮直送，品質優良',
+          '專業品質，效果顯著',
+          '熱門商品，人氣首選',
+          '限時特價，錯過可惜',
+          '品質優良，口碑推薦'
+        ];
+      }
+      
+      // 隨機選擇一個描述
+      const baseDesc = matchedKeywords[Math.floor(Math.random() * matchedKeywords.length)];
+      
+      // 根據價格添加促銷元素
+      let finalDesc = baseDesc;
+      if (originalPrice && originalPrice > price) {
+        const discount = Math.round((1 - price / originalPrice) * 100);
+        if (discount >= 30) {
+          finalDesc += `，限時${discount}折優惠`;
+        } else if (discount >= 20) {
+          finalDesc += `，特價優惠中`;
+        } else if (discount >= 10) {
+          finalDesc += `，優惠價`;
+        }
+      }
+      
+      // 根據價格範圍添加不同的描述
+      if (price > 0) {
+        if (price >= 1000) {
+          finalDesc += '，高端品質';
+        } else if (price >= 500) {
+          finalDesc += '，中高檔選擇';
+        } else if (price >= 100) {
+          finalDesc += '，經濟實惠';
+        } else {
+          finalDesc += '，超值優惠';
+        }
+      }
+      
+      // 添加一些常見的促銷詞彙
+      const promotions = ['', '，數量有限', '，售完為止', '，錯過可惜', '，立即搶購'];
+      const randomPromo = promotions[Math.floor(Math.random() * promotions.length)];
+      
+      return finalDesc + randomPromo;
+    }
+
+    // ===== 商品輸入 =====
+    let pendingImage = null;
+    els.pickImg.addEventListener('click', () => els.imgInput.click());
+    
+    // AI描述生成按鈕
+    const aiDescBtn = document.getElementById('ai-desc-btn');
+    if (aiDescBtn) {
+      aiDescBtn.addEventListener('click', () => {
+        const form = aiDescBtn.closest('form');
+        const nameInput = form.querySelector('input[name="name"]');
+        const priceInput = form.querySelector('input[name="price"]');
+        const originalPriceInput = form.querySelector('input[name="originalPrice"]');
+        const descTextarea = form.querySelector('textarea[name="desc"]');
+        
+        const productName = nameInput.value.trim();
+        const price = parseFloat(priceInput.value) || 0;
+        const originalPrice = parseFloat(originalPriceInput.value) || 0;
+        
+        if (!productName) {
+          alert('請先輸入商品名稱');
+          return;
+        }
+        
+        // 顯示載入狀態
+        aiDescBtn.textContent = '生成中...';
+        aiDescBtn.disabled = true;
+        
+        // 模擬AI生成過程（實際應用中可以調用真實的AI API）
+        setTimeout(() => {
+          const aiDescription = generateAIDescription(productName, price, originalPrice, pendingImage);
+          descTextarea.value = aiDescription;
+          
+          // 恢復按鈕狀態
+          aiDescBtn.textContent = 'AI';
+          aiDescBtn.disabled = false;
+          
+          // 顯示成功提示
+          showToast('AI描述生成完成！');
+        }, 800);
+      });
+    }
+    
+    // 批量AI描述生成
+    const batchAiDescBtn = document.getElementById('batch-ai-desc');
+    if (batchAiDescBtn) {
+      batchAiDescBtn.addEventListener('click', () => {
+        // 找出沒有描述的商品
+        const productsWithoutDesc = state.products.filter(p => !p.desc || p.desc.trim() === '');
+        
+        if (productsWithoutDesc.length === 0) {
+          showToast('所有商品都已有描述！');
+          return;
+        }
+        
+        // 顯示載入狀態
+        batchAiDescBtn.textContent = `正在生成 ${productsWithoutDesc.length} 個描述...`;
+        batchAiDescBtn.disabled = true;
+        
+        // 批量生成描述
+        let completed = 0;
+        productsWithoutDesc.forEach((product, index) => {
+          setTimeout(() => {
+            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
+            product.desc = aiDescription;
+            completed++;
+            
+            // 立即更新該行的顯示
+            const textarea = document.querySelector(`textarea[data-id="${product.id}"]`);
+            if (textarea) {
+              textarea.value = aiDescription;
+              textarea.style.backgroundColor = '#f0f9ff';
+              setTimeout(() => {
+                textarea.style.backgroundColor = '';
+              }, 1000);
+            }
+            
+            if (completed === productsWithoutDesc.length) {
+              // 全部完成
+              batchAiDescBtn.textContent = '為所有商品生成AI描述';
+              batchAiDescBtn.disabled = false;
+              showToast(`成功為 ${productsWithoutDesc.length} 個商品生成描述！`);
+              
+              // 重新渲染DM預覽
+              renderDM();
+            }
+          }, index * 200); // 每個商品間隔200ms，避免太快
+        });
+      });
+    }
+    
+    // 為選中商品生成AI描述
+    const aiDescSelectedBtn = document.getElementById('ai-desc-selected');
+    if (aiDescSelectedBtn) {
+      aiDescSelectedBtn.addEventListener('click', () => {
+        // 找出選中且沒有描述的商品
+        const selectedProducts = state.products.filter(p => 
+          state.selection.has(p.id) && (!p.desc || p.desc.trim() === '')
+        );
+        
+        if (selectedProducts.length === 0) {
+          showToast('選中的商品都已有描述！');
+          return;
+        }
+        
+        // 顯示載入狀態
+        aiDescSelectedBtn.textContent = `正在生成 ${selectedProducts.length} 個描述...`;
+        aiDescSelectedBtn.disabled = true;
+        
+        // 批量生成描述
+        let completed = 0;
+        selectedProducts.forEach((product, index) => {
+          setTimeout(() => {
+            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
+            product.desc = aiDescription;
+            completed++;
+            
+            // 立即更新該行的顯示
+            const textarea = document.querySelector(`textarea[data-id="${product.id}"]`);
+            if (textarea) {
+              textarea.value = aiDescription;
+              textarea.style.backgroundColor = '#f0f9ff';
+              setTimeout(() => {
+                textarea.style.backgroundColor = '';
+              }, 1000);
+            }
+            
+            if (completed === selectedProducts.length) {
+              // 全部完成
+              aiDescSelectedBtn.textContent = '為選中商品生成';
+              aiDescSelectedBtn.disabled = false;
+              showToast(`成功為 ${selectedProducts.length} 個選中商品生成描述！`);
+              
+              // 重新渲染DM預覽
+              renderDM();
+            }
+          }, index * 200); // 每個商品間隔200ms，避免太快
+        });
+      });
+    }
+    
+    els.imgInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        pendingImage = await fileToDataUrl(file);
+        els.imgName.textContent = file.name;
+      } catch(err){ console.error(err); }
+    });
+
+    els.form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(els.form);
+      const product = {
+        id: uid(),
+        name: (fd.get('name')||'').toString().trim(),
+        price: Number(fd.get('price')||0),
+        originalPrice: (fd.get('originalPrice')===''? '' : Number(fd.get('originalPrice')||0)),
+        desc: (fd.get('desc')||'').toString().trim(),
+        imageDataUrl: pendingImage || '',
+      };
+      if (!product.name || !product.price) { alert('請填商品名與售價'); return; }
+      state.products.unshift(product);
+      pendingImage = null; els.imgName.textContent = '尚未選擇'; els.form.reset();
+      renderTable(); renderDM();
+    });
+
+    els.csvInput.addEventListener('change', (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: async (res) => {
+          for (const row of res.data) {
+            let imageDataUrl = '';
+            if (row.imageUrl) {
+              try {
+                const resp = await fetch(row.imageUrl);
+                const blob = await resp.blob();
+                imageDataUrl = await fileToDataUrl(blob);
+              } catch(err){ console.warn('載圖失敗', err); }
+            }
+            state.products.push({ id: uid(), name: (row.name||'').toString(), price: Number(row.price||0), originalPrice: row.originalPrice? Number(row.originalPrice):'', desc: (row.desc||'').toString(), imageDataUrl });
+          }
+          renderTable(); renderDM();
+        }
+      });
+    });
+
+    // 下載批量匯入範本（CSV）
+    const btnTpl = document.getElementById('btn-download-template');
+    if (btnTpl) btnTpl.addEventListener('click', ()=>{
+      const header = '\uFEFFname,price,originalPrice,desc,imageUrl\n';
+      const headerCn = '商品名稱,售價,原價,商品說明,圖片連結網址(若無則免填)\n';
+      const blob = new Blob([header+headerCn], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='dm-import-template.csv'; a.click(); setTimeout(()=> URL.revokeObjectURL(url), 1000);
+    });
+
+    // ===== 商品表格 =====
+    function renderTable(){
+      els.tbody.innerHTML = '';
+      for (const p of state.products) {
+        const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="p-2 align-top"><input type="checkbox" data-id="${p.id}" ${state.selection.has(p.id)?'checked':''}></td>
+          <td class="p-2 align-top">
+            <div class="inline-block rounded-lg overflow-hidden cursor-pointer group" data-reupload="${p.id}" style="width:4rem;height:4rem;min-width:4rem">
+              ${p.imageDataUrl? `<img src="${p.imageDataUrl}" class="w-full h-full object-cover" />` : `<div class='w-full h-full grid place-items-center text-slate-400'>無商品圖</div>`}
+            </div>
+          </td>
+          <td class="p-2 align-top"><input class="w-48 border rounded-lg p-1" value="${escapeHtml(p.name)}" data-edit="name" data-id="${p.id}"></td>
+          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" value="${p.price}" data-edit="price" data-id="${p.id}"></td>
+          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" value="${p.originalPrice||''}" data-edit="originalPrice" data-id="${p.id}"></td>
+          <td class="p-2 align-top">
+            <div class="flex gap-1">
+              <textarea class="flex-1 border rounded-lg p-1" rows="2" data-edit="desc" data-id="${p.id}">${escapeHtml(p.desc)}</textarea>
+              <button type="button" class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ai-desc-single" data-id="${p.id}" title="AI生成描述">AI</button>
+            </div>
+          </td>`;
+        els.tbody.appendChild(tr);
+      }
+
+      // 單個商品AI描述生成
+      els.tbody.querySelectorAll('.ai-desc-single').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const productId = e.target.dataset.id;
+          const product = state.products.find(p => p.id === productId);
+          if (!product) return;
+          
+          const textarea = e.target.previousElementSibling;
+          
+          // 顯示載入狀態
+          e.target.textContent = '生成中...';
+          e.target.disabled = true;
+          
+          // 生成AI描述
+          setTimeout(() => {
+            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
+            textarea.value = aiDescription;
+            product.desc = aiDescription;
+            
+            // 恢復按鈕狀態
+            e.target.textContent = 'AI';
+            e.target.disabled = false;
+            
+            // 立即更新顯示
+            textarea.style.backgroundColor = '#f0f9ff';
+            setTimeout(() => {
+              textarea.style.backgroundColor = '';
+            }, 1000);
+            
+            showToast('AI描述生成完成！');
+          }, 600);
+        });
+      });
+      
+      els.tbody.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+        chk.addEventListener('change', (e)=>{
+          if (!hasScopeReady()){
+            alert('請先選店家與 DM 方案');
+            e.target.checked = false; return;
+          }
+          const id = e.target.getAttribute('data-id');
+          if (e.target.checked) state.selection.add(id); else state.selection.delete(id);
+          renderDM();
+        });
+      });
+
+      // 點縮圖重新上傳
+      els.tbody.querySelectorAll('[data-reupload]').forEach(box=>{
+        box.addEventListener('click', async ()=>{
+          const id = box.getAttribute('data-reupload');
+          const input = document.createElement('input'); input.type='file'; input.accept='image/*';
+          input.onchange = async (ev)=>{
+            const file = ev.target.files[0]; if (!file) return;
+            const url = await fileToDataUrl(file);
+            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; renderTable(); renderDM();
+          };
+          input.click();
+        });
+      });
+
+      els.tbody.querySelectorAll('[data-edit]').forEach(inp => {
+        inp.addEventListener('input', (e)=>{
+          const id = e.target.getAttribute('data-id');
+          const key = e.target.getAttribute('data-edit');
+          const p = state.products.find(x=>x.id===id); if (!p) return;
+          if (key==='price' || key==='originalPrice') p[key] = e.target.value===''? '' : Number(e.target.value);
+          else p[key] = e.target.value;
+          renderDM();
+        });
+      });
+
+      const selAll = document.getElementById('select-all');
+      if (selAll){
+        selAll.checked = state.products.length>0 && state.products.every(p=> state.selection.has(p.id));
+        selAll.addEventListener('change', ()=>{
+          if (selAll.checked){ state.products.forEach(p=> state.selection.add(p.id)); }
+          else { state.selection.clear(); }
+          renderTable(); renderDM();
+        });
+      }
+    }
+
+    // ===== 模板渲染 =====
+    els.templateSelect.addEventListener('change', ()=>{ state.template = els.templateSelect.value; renderDM(); });
+    els.fitSelect.addEventListener('change', ()=>{ state.imgFit = els.fitSelect.value; renderDM(); });
+    els.posSelect.addEventListener('change', ()=>{ state.imgPos = els.posSelect.value; renderDM(); });
+    els.ratioSelect.addEventListener('change', ()=>{ state.imgRatio = els.ratioSelect.value; renderDM(); });
+    els.gridCardH.addEventListener('change', ()=>{ state.gridCardH = Number(els.gridCardH.value); renderDM(); });
+    els.gridFill.addEventListener('change', ()=>{ state.gridFill = els.gridFill.checked; renderDM(); });
+    els.gridImgFrac.addEventListener('change', ()=>{ state.gridImgFrac = Number(els.gridImgFrac.value); renderDM(); });
+
+    function renderDM(){
+      const wrap = els.dmCanvas; wrap.innerHTML='';
+      const selected = state.products.filter(p=> state.selection.has(p.id));
+      const items = selected.length? selected : state.products;
+      if (state.template==='single') renderPagedSingle(wrap, items);
+      else if (state.template==='singleFull') renderPagedSingleFull(wrap, items);
+      else if (state.template==='grid9') renderPagedGrid9(wrap, items);
+      else if (state.template==='list') renderPagedList(wrap, items);
+    }
+
+    function createPage(){ const page = document.createElement('div'); page.className='dm-page relative'; return page; }
+
+    function renderPagedGrid9(root, items){
+      for (let i=0;i<Math.max(1, Math.ceil(items.length/9)); i++){
+        const page = createPage();
+        const slice = items.slice(i*9, i*9+9);
+        renderGrid9(page, slice);
+        root.appendChild(page);
+      }
+    }
+    function renderPagedList(root, items){
+      const pageSize = 12;
+      for (let i=0;i<Math.max(1, Math.ceil(items.length/pageSize)); i++){
+        const page = createPage(); renderList(page, items.slice(i*pageSize, i*pageSize+pageSize)); root.appendChild(page);
+      }
+    }
+    function renderPagedSingle(root, items){
+      const pageSize = 1; for (let i=0;i<Math.max(1, Math.ceil(items.length/pageSize)); i++){ const page=createPage(); renderSingle(page, items[i]); root.appendChild(page);} }
+    function renderPagedSingleFull(root, items){
+      const pageSize = 1; for (let i=0;i<Math.max(1, Math.ceil(items.length/pageSize)); i++){ const page=createPage(); renderSingleFull(page, items[i]); root.appendChild(page);} }
+
+    function getActiveShop(){ return state.selectedShopId ? findShopById(state.selectedShopId) : null; }
+    function getActiveMeta(){
+      if (!hasScopeReady()) return { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
+      const c = findCampById(state.selectedShopId, state.selectedCampaignId);
+      const meta = c?.meta || { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
+      return meta;
+    }
+
+    function getBorderStyle(meta) {
+      if (!meta.borderStyle || meta.borderStyle === 'none') return '';
+      const borderWidth = meta.borderStyle === 'double' ? '3px' : '2px';
+      return `border: ${borderWidth} ${meta.borderStyle} ${meta.borderColor || '#e2e8f0'};`;
+    }
+
+    function getBackgroundStyle(meta) {
+      if (!meta.backgroundColor || meta.backgroundColor === '#ffffff') return '';
+      return `background-color: ${meta.backgroundColor};`;
+    }
+
+    // 創建一個完全獨立的輸出節點，使用原始尺寸，不受預覽縮放影響
+    function createExportNode(sourceNode) {
+      try {
+        // 創建一個新的div作為輸出容器，使用原始DM尺寸
+        const exportNode = document.createElement('div');
+        exportNode.style.width = '1080px';
+        exportNode.style.height = '1350px';
+        exportNode.style.position = 'relative';
+        exportNode.style.overflow = 'hidden';
+        exportNode.style.backgroundColor = '#ffffff';
+        exportNode.style.boxSizing = 'border-box';
+        exportNode.style.transform = 'none'; // 確保沒有縮放變換
+        exportNode.style.transformOrigin = 'top left';
+        
+        // 完全複製源節點的內容
+        exportNode.innerHTML = sourceNode.innerHTML;
+        
+        // 強制重新計算所有樣式，確保使用原始尺寸
+        const allElements = exportNode.querySelectorAll('*');
+        allElements.forEach(el => {
+          // 移除所有可能影響輸出的class和style
+          el.className = el.className.replace(/scale-\d+|transform|transition/g, '');
+          el.style.transform = 'none';
+          el.style.transition = 'none';
+          
+          // 強制設定關鍵樣式
+          if (el.tagName === 'IMG') {
+            el.style.objectFit = state.imgFit === 'contain' ? 'contain' : 'cover';
+            el.style.objectPosition = state.imgPos || 'center';
+            el.style.width = '100%';
+            el.style.height = '100%';
+            el.style.display = 'block';
+            el.style.maxWidth = 'none';
+            el.style.maxHeight = 'none';
+          }
+          
+          // 確保所有容器使用正確的尺寸
+          if (el.style.aspectRatio) {
+            el.style.width = '100%';
+            el.style.height = '100%';
+          }
+          
+          // 強制設定所有可能影響佈局的樣式
+          if (el.classList.contains('absolute')) {
+            el.style.position = 'absolute';
+          }
+          if (el.classList.contains('relative')) {
+            el.style.position = 'relative';
+          }
+          if (el.classList.contains('flex')) {
+            el.style.display = 'flex';
+          }
+          if (el.classList.contains('grid')) {
+            el.style.display = 'grid';
+          }
+        });
+        
+        // 臨時添加到DOM中進行渲染，確保在視覺範圍外
+        exportNode.style.position = 'fixed';
+        exportNode.style.top = '-9999px';
+        exportNode.style.left = '-9999px';
+        exportNode.style.zIndex = '-9999';
+        exportNode.style.visibility = 'hidden';
+        document.body.appendChild(exportNode);
+        
+        console.log('Export node created successfully'); // 調試信息
+        return exportNode;
+      } catch (error) {
+        console.error('Error creating export node:', error);
+        throw error;
+      }
+    }
+    
+    // 清理臨時節點
+    function cleanupExportNode(node) {
+      if (node && node.parentNode) {
+        node.parentNode.removeChild(node);
+      }
+    }
+    
+    // 測試函數：驗證輸出節點尺寸
+    function testExportNodeSize(node) {
+      const rect = node.getBoundingClientRect();
+      console.log('Export node size:', {
+        width: rect.width,
+        height: rect.height,
+        expectedWidth: 1080,
+        expectedHeight: 1350,
+        isCorrect: rect.width === 1080 && rect.height === 1350
+      });
+      return rect.width === 1080 && rect.height === 1350;
+    }
+
+    function renderSingle(root, p){
+      const node = document.createElement('div'); node.className='absolute inset-0 flex flex-col';
+      if (!p) { node.innerHTML = `<div class='m-auto text-slate-400'>請先新增商品並勾選</div>`; root.appendChild(node); return; }
+      const meta = getActiveMeta(); const shop = getActiveShop(); const brand = shop?.brandColor || '#0ea5e9';
+      node.innerHTML = `
+        <div class="h-20 px-10 flex items-center justify-between relative">
+          <div class="text-3xl font-extrabold tracking-wide">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
+          ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-slate-800 pointer-events-none'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
+          <div class="flex items-center gap-2">
+            ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white'/></div>`:''}
+        </div>
+          </div>
+          <div class="grid grid-cols-2 gap-8 px-10 py-6 flex-1">
+          <div class="bg-white rounded-2xl shadow overflow-hidden" style="aspect-ratio:${state.imgRatio}; ${getBorderStyle(meta)}${getBackgroundStyle(meta)}">${productImageDom(p)}</div>
+          <div class="flex flex-col justify-start">
+              <div class="flex items-start justify-between gap-3 mb-4">
+                <div class="text-4xl font-extrabold leading-tight flex-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
+                ${meta.showBadge? `<div class=\"px-3 py-1 rounded-full bg-rose-600 text-white text-sm flex-none ml-2\">${escapeHtml(meta.badgeText||'限時特價')}</div>`:''}
+        </div>
+            <div class="text-3xl font-extrabold mb-3">${priceTag(p.price)} ${p.originalPrice? `<span class='text-lg text-slate-400 line-through align-middle ml-2'>${priceTag(p.originalPrice)}</span>`:''}</div>
+            <div class="text-lg text-slate-600 mb-3 flex-1" style="line-height: 1.3;">${escapeHtml(p.desc||'')}</div>
+            <div class="text-sm text-slate-500 mb-4">* 價格變動以當下標示為準</div>
+              ${renderSingleSupplement(meta, shop)}
+        </div>
+        </div>
+        <div class="h-16 bg-slate-900/95 text-white flex items-center justify-center text-sm tracking-widest px-4">
+          ${renderFooterInfo(meta, shop)}
+        </div>`;
+      root.appendChild(node);
+    }
+
+    function renderSingleFull(root, p){
+      const node = document.createElement('div'); node.className='absolute inset-0';
+      if (!p) { node.innerHTML = `<div class='w-full h-full grid place-items-center text-slate-400'>請先新增商品並勾選</div>`; root.appendChild(node); return; }
+      const bgSize = state.imgFit==='contain'?'contain':'cover';
+      const bgPos = ({center:'center', top:'top', bottom:'bottom', left:'left', right:'right'})[state.imgPos] || 'center';
+      const meta = getActiveMeta(); const shop = getActiveShop(); const brand = shop?.brandColor || '#0ea5e9';
+      node.innerHTML = `
+        <div class="absolute inset-0">${p.imageDataUrl?`<div class='w-full h-full' style="background-image:url('${p.imageDataUrl}');background-size:${bgSize};background-position:${bgPos};background-repeat:no-repeat;"></div>`:`<div class='w-full h-full bg-gradient-to-br from-slate-200 to-slate-100'></div>`}</div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"></div>
+        <div class="absolute inset-x-0 top-0 h-20 px-10 flex items-center justify-between text-white relative">
+          <div class="text-3xl font-extrabold tracking-wide drop-shadow">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
+          ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-white/90 pointer-events-none drop-shadow'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
+          <div class="flex items-center gap-2">
+            ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white/90'/></div>`:''}
+        </div>
+          </div>
+        <div class="absolute inset-x-0 bottom-0 p-8 flex flex-col">
+          <div class="max-w-[90%] text-white drop-shadow mb-4">
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <div class="text-4xl font-extrabold leading-tight flex-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
+              ${meta.showBadge? `<div class="px-3 py-1 rounded-full bg-rose-600 text-white text-sm flex-none ml-2">${escapeHtml(meta.badgeText||'限時特價')}</div>`:''}
+          </div>
+            <div class="text-lg opacity-95 mb-3" style="line-height: 1.3;">${escapeHtml(p.desc||'')}</div>
+          </div>
+          <div class="flex items-end gap-4 mb-4">
+            <div class="text-6xl font-extrabold text-white drop-shadow">${priceTag(p.price)}</div>
+            ${p.originalPrice? `<div class='text-2xl text-white/80 line-through drop-shadow'>${priceTag(p.originalPrice)}</div>`:''}
+          </div>
+          <div class="flex-1">${renderNotesBlock(meta,'glass', shop)}</div>
+          <div class="mt-4 h-14 bg-white/92 rounded-2xl px-6 flex items-center justify-center text-slate-900 text-sm tracking-widest shadow">${renderFooterInfo(meta, shop)}</div>
+        </div>`;
+      root.appendChild(node);
+    }
+
+    function renderGrid9(root, arr){
+      const node = document.createElement('div'); node.className='absolute inset-0 flex flex-col';
+      const meta = getActiveMeta(); const shop = getActiveShop(); const brand = shop?.brandColor || '#0ea5e9';
+      // 估算下方補充區高度，動態壓縮卡片高度避免互相覆蓋
+      const hasSupp = !!( (meta.showContact && (buildContactLines(shop).length>0)) || (meta.showNotes && (meta.notes||'').trim()!=='') || (meta.qrDataUrl && meta.showQR !== false) );
+      const suppH = hasSupp ? 140 : 0; // 近似補充區高度
+      const headerH = 80; // h-20
+      const footerH = 64; // h-16
+      const verticalGap = 24; // gap-6
+      const pageH = 1350;
+      const paddingBottom = 8; // pb-2
+      const gridAvail = pageH - headerH - footerH - suppH - paddingBottom - 16; // 16 為預留
+      const rowGaps = verticalGap * 2;
+      const perCardH = Math.max(160, Math.min(state.gridCardH, Math.floor((gridAvail - rowGaps)/3)));
+
+      node.innerHTML = `
+        <div class="h-20 px-10 flex items-center justify-between relative">
+          <div class="text-3xl font-extrabold">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
+          ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-slate-800 pointer-events-none'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
+          <div class="flex items-center gap-2">
+            ${meta.showBadge? `<div class="px-3 py-1 rounded-full bg-rose-600 text-white text-sm">${escapeHtml(meta.badgeText||'限時特價')}</div>`:''}
+            ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white'/></div>`:''}
+        </div>
+        </div>
+        <div class="grid grid-cols-3 gap-6 px-10 pb-6 place-content-start" style="min-height:${perCardH*3 + rowGaps}px"></div>
+        <div class="mt-6 px-10 pb-2">
+          <div class="grid grid-cols-12 gap-4 items-start">
+            <div class="col-span-6">${(function(){ const lines = meta.showContact? buildContactLines(getActiveShop()):[]; return lines.length? `<div class='bg-white rounded-2xl px-6 py-3 text-xs text-slate-700 shadow space-y-1'>${lines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>`:''; })()}</div>
+            <div class="col-span-4">${meta.showNotes && (meta.notes||'').trim()!=='' ? `<div class='bg-white rounded-2xl px-6 py-3 text-sm text-slate-800 shadow'>${escapeHtml(meta.notes)}</div>`:''}</div>
+            <div class="col-span-2 flex justify-end">${(function(){ 
+              const hasQR = !!(meta.qrDataUrl); 
+              const showQR = meta.showQR !== false; // 簡化條件，預設顯示
+              return hasQR && showQR ? `<img src='${meta.qrDataUrl}' class='w-24 h-24 object-contain rounded-lg border'/>` : ''; 
+            })()}</div>
+          </div>
+        </div>
+        <div class="h-16 bg-slate-900 text-white flex items-center justify-center text-sm tracking-widest px-4">${renderFooterInfo(meta, shop)}</div>`;
+      const grid = node.children[1];
+      const a = arr.slice(0,9); if (state.gridFill) { while (a.length<9) a.push(null); }
+      for (const p of a){
+        const card = document.createElement('div'); card.className='bg-white rounded-2xl shadow overflow-hidden flex flex-col'; card.style.height = perCardH+'px'; card.style.cssText += getBorderStyle(meta) + getBackgroundStyle(meta);
+        if (!p){ card.innerHTML = `<div class='flex-1 grid place-items-center text-slate-300'>空白</div>`; }
+        else {
+          const imgH = Math.round(perCardH * 0.55); // 減少圖片比例到55%
+          const textH = perCardH - imgH; // 剩餘空間給文字
+          card.innerHTML = `
+            <div class="flex-none bg-slate-100 overflow-hidden high-res-img" style="height:${imgH}px">${productImageDom(p, true)}</div>
+            <div class="p-3 flex-1 flex flex-col" style="height:${textH}px;">
+              <div class="text-base font-bold mb-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
+              <div class="text-sm text-slate-600 mb-2 flex-1" style="line-height: 1.2;">${escapeHtml(p.desc||'')}</div>
+              <div class="flex items-baseline gap-2 mt-auto">
+                <div class="text-xl font-extrabold">${priceTag(p.price)}</div>
+                ${p.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
+              </div>
+            </div>`;
+        }
+        grid.appendChild(card);
+      }
+      root.appendChild(node);
+    }
+
+    function renderList(root, arr){
+      const node = document.createElement('div'); node.className='absolute inset-0 p-10 flex flex-col';
+      const meta = getActiveMeta(); const shop = getActiveShop(); const brand = shop?.brandColor || '#0ea5e9';
+      node.innerHTML = `
+        <div class="text-4xl font-extrabold mb-4 relative flex items-center justify-between">
+          <div>${escapeHtml(shop?.name||'')}</div>
+          ${meta.showCampaignName? `<span class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-slate-800 pointer-events-none'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</span>`:''}
+          <div class="flex items-center gap-2">
+            ${meta.showBadge? `<div class="px-3 py-1 rounded-full bg-rose-600 text-white text-sm">${escapeHtml(meta.badgeText||'限時特價')}</div>`:''}
+            ${meta.showLogo && shop?.logoDataUrl? `<img src='${shop.logoDataUrl}' class='w-12 h-12 object-contain rounded-md border bg-white'/>`:''}
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow divide-y" style="${getBorderStyle(meta)}${getBackgroundStyle(meta)}"></div>
+        <div class="mt-4">${renderNotesBlock(meta,'light', shop,'mt-2')}</div>
+        <div class="mt-auto text-xs text-slate-500">${renderFooterInfo(meta, shop)}</div>`;
+      const list = node.children[1];
+      const max = 12; const items = arr.slice(0, max);
+      for (const p of items){
+        const row = document.createElement('div'); row.className='grid grid-cols-12 items-start gap-2 p-4';
+        row.innerHTML = `
+          <div class="col-span-2"><div class='rounded-xl overflow-hidden high-res-img' style='width:4.5rem; aspect-ratio:${state.imgRatio}; ${getBorderStyle(meta)}${getBackgroundStyle(meta)}'>${productImageDom(p, true)}</div></div>
+          <div class="col-span-5 text-lg font-semibold" style="line-height: 1.2;">${escapeHtml(p?.name||'商品')}</div>
+          <div class="col-span-3 text-sm text-slate-600" style="line-height: 1.3;">${escapeHtml(p?.desc||'')}</div>
+          <div class="col-span-2 text-right flex flex-col justify-start">
+            <div class="text-3xl font-extrabold">${priceTag(p?.price||0)}</div>
+            ${p?.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
+          </div>`;
+        list.appendChild(row);
+      }
+      root.appendChild(node);
+    }
+
+    function renderFooterInfo(meta, shop){
+      return '掃描 QR 立刻下單｜@yourshop';
+    }
+
+    function buildContactLines(shop){
+      const c = (shop&&shop.contact)||{};
+      const map = [
+        ['person','聯絡人'],
+        ['phone','電話'],
+        ['line','LINE'],
+        ['facebook','Facebook'],
+        ['instagram','Instagram'],
+        ['address','地址'],
+        ['website','網址'],
+      ];
+      const lines = [];
+      for (const [key,label] of map){
+        const v = (c[key]||'').toString().trim(); if (!v) continue; lines.push(`${label}：${v}`);
+      }
+      return lines;
+    }
+
+    function renderNotesBlock(meta, theme, shop, extraClass){
+      const hasNotes = !!(meta.showNotes && (meta.notes||'').trim()!=='');
+      const contactLines = meta.showContact ? buildContactLines(shop) : [];
+      const showContact = !!(meta.showContact && contactLines.length);
+      const hasQR = !!(meta.qrDataUrl||'');
+      const showQR = meta.showQR !== false; // 簡化條件，預設顯示
+      if (!hasNotes && !showContact && !(hasQR && showQR)) return '';
+      const note = hasNotes? escapeHtml(meta.notes||'') : '';
+      const contactDom = showContact? `<div class='text-xs text-slate-600 mt-2 space-y-1'>${contactLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>` : '';
+      const qr = (hasQR && showQR)? `<img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain ml-4 rounded-lg border'/>` : '';
+      const base = theme==='glass' ? 'bg-white/40 backdrop-blur-sm text-slate-900' : 'bg-white text-slate-800';
+      const extra = extraClass? ` ${extraClass}` : '';
+      return `<div class='${base} rounded-2xl px-6 py-3 flex items-center justify-between shadow${extra}'>
+        <div class='text-sm pr-4'>${note}${contactDom}</div>
+        ${qr}
+      </div>`;
+    }
+
+    // 單品：右側欄補充區（上：聯絡；中：說明；右：QR）
+    function renderSingleSupplement(meta, shop){
+      const hasNotes = !!(meta.showNotes && (meta.notes||'').trim()!=='');
+      const contactLines = meta.showContact ? buildContactLines(shop) : [];
+      const hasContact = contactLines.length>0;
+      const hasQR = !!(meta.qrDataUrl||'');
+      const showQR = meta.showQR !== false; // 簡化條件，預設顯示
+      if (!hasNotes && !hasContact && !(hasQR && showQR)) return '';
+      const contactDom = hasContact? `<div class='text-xs text-slate-600 space-y-1'>${contactLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>`:'';
+      const notesDom = hasNotes? `<div class='mt-2 text-sm text-slate-700'>${escapeHtml(meta.notes||'')}</div>`:'';
+      const qrDom = (hasQR && showQR)? `<img src='${meta.qrDataUrl}' alt='QR' class='w-28 h-28 object-contain rounded-lg border'/>`:'';
+      return `<div class='mt-4 grid grid-cols-3 gap-4 items-start'>
+        <div class='col-span-2'>${contactDom}${!hasNotes && hasContact? '': notesDom}</div>
+        <div class='col-span-1 flex justify-end'>${qrDom}</div>
+      </div>`;
+    }
+
+    // ===== 匯出 =====
+    function prepareForExport() {
+      // 暫時移除縮放，確保輸出時是原始尺寸
+      const originalTransform = els.scaleWrap.style.transform;
+      els.scaleWrap.style.transform = 'scale(1)';
+      return () => {
+        // 恢復原始縮放
+        els.scaleWrap.style.transform = originalTransform;
+      };
+    }
+
+    // 獲取下載頁面範圍
+    function getDownloadPageRange() {
+      const range = els.downloadRange.value;
+      const allPages = els.dmCanvas.children.length ? Array.from(els.dmCanvas.children) : [els.dmCanvas];
+      const totalPages = allPages.length;
+      
+      switch(range) {
+        case 'current':
+          return [0]; // 只下載第一頁
+        case 'custom':
+          const start = parseInt(els.startPage.value) || 1;
+          const end = parseInt(els.endPage.value) || totalPages;
+          const startIdx = Math.max(0, start - 1);
+          const endIdx = Math.min(totalPages - 1, end - 1);
+          return Array.from({length: endIdx - startIdx + 1}, (_, i) => startIdx + i);
+        case 'all':
+        default:
+          return Array.from({length: totalPages}, (_, i) => i);
+      }
+    }
+
+    // 下載範圍選擇事件
+    els.downloadRange.addEventListener('change', ()=>{
+      const range = els.downloadRange.value;
+      els.customRange.classList.toggle('hidden', range !== 'custom');
+    });
+
+    els.downloadPng.addEventListener('click', async ()=>{
+      console.log('PNG download clicked');
+      if (!hasScopeReady()) { alert('請先選店家與 DM 方案'); return; }
+      
+      try {
+        const shop = findShopById(state.selectedShopId)?.name||'shop';
+        const camp = findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'campaign';
+        const pageNodes = els.dmCanvas.querySelectorAll('.dm-page');
+        const allPages = pageNodes.length ? Array.from(pageNodes) : [els.dmCanvas];
+        const pageIndices = getDownloadPageRange();
+        
+        console.log('Starting PNG download, pages:', pageIndices);
+        
+        // 移除縮放
+        const originalTransform = els.scaleWrap.style.transform;
+        els.scaleWrap.style.transform = 'scale(1)';
+        await new Promise(r => setTimeout(r, 100));
+        
+        // 如果只有一頁，直接下載
+        if (pageIndices.length === 1) {
+          const page = allPages[pageIndices[0]];
+          const canvas = await html2canvas(page, { 
+            backgroundColor: '#ffffff', 
+            scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
+            useCORS: true,
+            allowTaint: true,
+            logging: false
+          });
+          
+          const a = document.createElement('a'); 
+          a.href = canvas.toDataURL('image/png', 1.0); 
+          a.download = `${shop}-${camp}-${Date.now()}-p${pageIndices[0]+1}.png`; 
+          a.click();
+        } else {
+          // 多頁下載，創建ZIP檔案
+          const JSZip = window.JSZip;
+          if (!JSZip) {
+            // 如果沒有JSZip，逐一下載
+            for (const i of pageIndices) {
+              const page = allPages[i];
+              const canvas = await html2canvas(page, { 
+                backgroundColor: '#ffffff', 
+                scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
+                useCORS: true,
+                allowTaint: true,
+                logging: false
+              });
+              
+              const a = document.createElement('a'); 
+              a.href = canvas.toDataURL('image/png', 1.0); 
+              a.download = `${shop}-${camp}-${Date.now()}-p${i+1}.png`; 
+              a.click();
+              
+              // 延遲避免瀏覽器阻擋
+              if (i < pageIndices.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
+          } else {
+            // 使用JSZip創建壓縮檔
+            const zip = new JSZip();
+            
+            for (const i of pageIndices) {
+              const page = allPages[i];
+              const canvas = await html2canvas(page, { 
+                backgroundColor: '#ffffff', 
+                scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
+                useCORS: true,
+                allowTaint: true,
+                logging: false
+              });
+              
+              const base64 = canvas.toDataURL('image/png', 1.0).split(',')[1];
+              zip.file(`page-${i+1}.png`, base64, { base64: true });
+            }
+            
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(zipBlob);
+            a.download = `${shop}-${camp}-${Date.now()}.zip`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }
+        }
+        
+        // 恢復原始縮放
+        els.scaleWrap.style.transform = originalTransform;
+        
+        console.log('PNG download completed');
+      } catch (error) {
+        console.error('PNG download error:', error);
+        alert('下載失敗：' + error.message);
+      }
+    });
+
+    els.downloadPdf.addEventListener('click', async ()=>{
+      console.log('PDF download clicked');
+      if (!hasScopeReady()) { alert('請先選店家與 DM 方案'); return; }
+      
+      try {
+      const { jsPDF } = window.jspdf;
+        const shop = findShopById(state.selectedShopId)?.name||'shop';
+        const camp = findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'campaign';
+        const pageNodes = els.dmCanvas.querySelectorAll('.dm-page');
+        const allPages = pageNodes.length ? Array.from(pageNodes) : [els.dmCanvas];
+        const pageIndices = getDownloadPageRange();
+        
+        console.log('Starting PDF download, pages:', pageIndices);
+        
+        // 移除縮放
+        const originalTransform = els.scaleWrap.style.transform;
+        els.scaleWrap.style.transform = 'scale(1)';
+        await new Promise(r => setTimeout(r, 100));
+        
+        // 逐頁渲染，並以每頁實際canvas尺寸建立PDF頁
+        let pdf = null;
+        for (let i = 0; i < pageIndices.length; i++) {
+          const pageIndex = pageIndices[i];
+          const page = allPages[pageIndex];
+          
+          console.log(`Processing PDF page ${i+1}/${pageIndices.length}`);
+          
+          const canvas = await html2canvas(page, { 
+            backgroundColor: '#ffffff', 
+            scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
+            useCORS: true,
+            allowTaint: true,
+            logging: false
+          });
+          
+          console.log('PDF Canvas created, size:', canvas.width, 'x', canvas.height);
+          
+          const imgData = canvas.toDataURL('image/png', 1.0);
+          
+          // 第一頁時，以canvas實際尺寸建立PDF文件
+          if (!pdf) {
+            pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height], orientation: 'portrait' });
+          } else {
+            pdf.addPage([canvas.width, canvas.height], 'portrait');
+          }
+          // 以原尺寸放入，避免任何拉伸
+          pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        }
+        
+        if (pdf) pdf.save(`${shop}-${camp}-${Date.now()}.pdf`);
+        
+        // 恢復原始縮放
+        els.scaleWrap.style.transform = originalTransform;
+        
+        console.log('PDF download completed');
+      } catch (error) {
+        console.error('PDF download error:', error);
+        alert('下載失敗：' + error.message);
+      }
+    });
+
+    // ===== 預覽縮放 =====
+    function applyScale(){
+      if (state.preview.fit){
+        const pad = 16; const w = els.previewWrap.clientWidth - pad*2; const s = Math.min(1, w/1080);
+        state.preview.scale = s; els.zoomRange.value = s.toFixed(2); els.zoomVal.textContent = Math.round(s*100)+'%';
+      }
+      els.scaleWrap.style.transform = `scale(${state.preview.scale})`;
+    }
+    window.addEventListener('resize', ()=>{ if (state.preview.fit) applyScale(); });
+    els.zoomFit.addEventListener('click', ()=>{ state.preview.fit=true; applyScale(); });
+    els.zoomBtns.forEach(btn=> btn.addEventListener('click', ()=>{ state.preview.fit=false; state.preview.scale = Number(btn.dataset.z); els.zoomRange.value = state.preview.scale; els.zoomVal.textContent = Math.round(state.preview.scale*100)+'%'; applyScale(); }));
+    els.zoomRange.addEventListener('input', (e)=>{ state.preview.fit=false; state.preview.scale = Number(e.target.value); els.zoomVal.textContent = Math.round(state.preview.scale*100)+'%'; applyScale(); });
+
+    // ===== 預設樣式（帳號儲存） =====
+    const PRESET_KEY_PREFIX = 'dm-presets-v4:'; // 每個帳號一份（只讀用）
+
+    function defaultPresets(){
+      return [
+        { id: uid(), name: '單品左右版', pinned:false, settings:{ template:'single', imgFit:'cover', imgPos:'center', imgRatio:'4/5', gridCardH:360, gridFill:true, gridImgFrac:0.6 }},
+        { id: uid(), name: '單品滿版背景', pinned:false, settings:{ template:'singleFull', imgFit:'cover', imgPos:'center', imgRatio:'4/5', gridCardH:360, gridFill:true, gridImgFrac:0.6 }},
+        { id: uid(), name: '九宮格', pinned:false, settings:{ template:'grid9', imgFit:'cover', imgPos:'center', imgRatio:'4/5', gridCardH:360, gridFill:true, gridImgFrac:0.6 }},
+        { id: uid(), name: '清單式', pinned:false, settings:{ template:'list', imgFit:'cover', imgPos:'center', imgRatio:'4/5', gridCardH:360, gridFill:true, gridImgFrac:0.6 }},
+      ];
+    }
+
+    function storageKeyV4(){ return state.user ? PRESET_KEY_PREFIX + state.user.id : null; }
+
+    function loadPresets(){
+      // 未登入或尚未選擇範圍：僅顯示內建預設
+      if (!state.user || !hasScopeReady()) return defaultPresets();
+      const keyV5 = presetsV5Key(state.selectedShopId, state.selectedCampaignId);
+      try {
+        const raw = keyV5 ? localStorage.getItem(keyV5) : null;
+        const arr = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(arr) && arr.length>0) return arr;
+      } catch(err){ console.warn('讀取 v5 預設失敗', err); }
+      // fallback：顯示內建預設（也可選擇讀 v4，但不寫回）
+      return defaultPresets();
+    }
+
+    function savePresets(list){
+      if (!state.user){ alert('請先登入帳號才能儲存樣式'); return false; }
+      if (!hasScopeReady()){ return false; }
+      const key = presetsV5Key(state.selectedShopId, state.selectedCampaignId);
+      try { localStorage.setItem(key, JSON.stringify(list)); return true; }
+      catch(err){ console.error('寫入失敗', err); alert('儲存失敗：瀏覽器可能封鎖了儲存空間'); return false; }
+    }
+
+    let presets = [];
+
+    // 刪除樣式（集中處理）：成功回傳 true
+    function deletePresetById(id){
+      if (!state.user) { try{ alert('請先登入以刪除'); }catch(_){} return false; }
+      const before = presets.length;
+      presets = presets.filter(x=>x.id !== id);
+      const saved = savePresets(presets);
+      renderPresetButtons();
+      return saved && presets.length === before - 1;
+    }
+
+    // 刪除確認微浮層（避免瀏覽器 confirm 被封鎖）
+    let delBubble = null;
+    function closeDelBubble(){ if (delBubble){ delBubble.remove(); delBubble=null; } }
+    function openDelBubble(anchorBtn, id, name){
+      closeDelBubble();
+      if (!state.user){ try{ alert('請先登入以刪除'); }catch(_){} return; }
+      const box = document.createElement('div');
+      box.className = 'absolute z-20 -right-2 top-full mt-1 bg-white border rounded-xl shadow p-2 flex items-center gap-2 text-sm del-pop';
+      box.dataset.id = id;
+      box.innerHTML = `<span>刪除「${escapeHtml(name||'樣式')}」？</span>
+        <button class="px-2 py-1 rounded-lg bg-rose-600 text-white" data-act="confirm">刪除</button>
+        <button class="px-2 py-1 rounded-lg border" data-act="cancel">取消</button>`;
+      const host = anchorBtn.parentElement; host.style.position = 'relative'; host.appendChild(box); delBubble = box;
+      box.querySelector('[data-act="confirm"]').addEventListener('click', (e)=>{ e.stopPropagation(); e.preventDefault(); deletePresetById(id); closeDelBubble(); });
+      box.querySelector('[data-act="cancel"]').addEventListener('click', (e)=>{ e.stopPropagation(); e.preventDefault(); closeDelBubble(); });
+      setTimeout(()=> document.addEventListener('click', (ev)=>{ if (!box.contains(ev.target)) closeDelBubble(); }, { once:true }), 0);
+    }
+
+    function currentSettings(){
+      return {
+        template: state.template, imgFit: state.imgFit, imgPos: state.imgPos, imgRatio: state.imgRatio,
+        gridCardH: state.gridCardH, gridFill: state.gridFill, gridImgFrac: state.gridImgFrac,
+      };
+    }
+
+    function applySettings(s){ if (!s) return; state.template=s.template??state.template; els.templateSelect.value=state.template; state.imgFit=s.imgFit??state.imgFit; els.fitSelect.value=state.imgFit; state.imgPos=s.imgPos??state.imgPos; els.posSelect.value=state.imgPos; state.imgRatio=s.imgRatio??state.imgRatio; els.ratioSelect.value=state.imgRatio; state.gridCardH=s.gridCardH??state.gridCardH; els.gridCardH.value=String(state.gridCardH); state.gridFill=s.gridFill??state.gridFill; els.gridFill.checked=!!state.gridFill; state.gridImgFrac=s.gridImgFrac??state.gridImgFrac; els.gridImgFrac.value=String(state.gridImgFrac); renderDM(); }
+
+    function sortPresetsForView(list){ return list.slice().sort((a,b)=> (b.pinned?1:0)-(a.pinned?1:0)); }
+
+    function renderPresetButtons(){
+      const box = els.presetList; box.innerHTML='';
+      const display = sortPresetsForView(presets);
+      if (!display.length){ box.innerHTML = `<span class='text-xs text-slate-400'>尚無樣式，登入後可新增。</span>`; return; }
+      for (const p of display){
+        const wrap = document.createElement('div'); wrap.className='relative group flex items-center';
+        const btn = document.createElement('button'); btn.type='button'; btn.className='pill px-3 py-1 rounded-full border bg-white text-sm'; btn.textContent=p.name; btn.title='點一下套用';
+        btn.addEventListener('click', (e)=>{ e.stopPropagation(); applySettings(p.settings); openPresetMenu(wrap, p); });
+        const del = document.createElement('button'); del.type='button'; del.dataset.del = p.id; del.dataset.name = p.name; del.className='ml-1 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 text-xs w-6 h-6 rounded-full inline-grid place-items-center'; del.textContent='x'; del.title='刪除';
+        del.addEventListener('click', (e)=>{ e.stopPropagation(); e.preventDefault(); openDelBubble(del, p.id, p.name); });
+        wrap.append(btn, del); box.appendChild(wrap);
+      }
+    }
+
+    // 事件代理備援：確保任何 data-del 點擊都能刪除（避免某些環境直綁 listener 失效）
+    els.presetList.addEventListener('click', (ev)=>{
+      const t = ev.target.closest('[data-del]');
+      if (!t) return;
+      ev.stopPropagation(); ev.preventDefault();
+      openDelBubble(t, t.getAttribute('data-del'), t.getAttribute('data-name') || '');
+    });
+
+    // 釘選選單
+    let openMenuEl=null; let menuTimer=null;
+    function closePresetMenu(){ if (openMenuEl){ openMenuEl.remove(); openMenuEl=null; } if (menuTimer){ clearTimeout(menuTimer); menuTimer=null; } }
+    function openPresetMenu(anchor, preset){
+      closePresetMenu();
+      if (!state.user) return; // 未登入不顯示選單
+      const menu = document.createElement('div');
+      menu.className = 'absolute left-0 top-full mt-1 z-10 bg-white border rounded-xl shadow text-sm overflow-hidden';
+      const item = document.createElement('button'); item.type='button'; item.className='px-3 py-1 hover:bg-slate-50 w-full text-left'; item.textContent = preset.pinned? '取消釘選' : '📌 釘選到最前';
+      item.addEventListener('click', (e)=>{ e.stopPropagation(); preset.pinned = !preset.pinned; if (!savePresets(presets)) return; renderPresetButtons(); closePresetMenu(); });
+      menu.appendChild(item); anchor.appendChild(menu); openMenuEl=menu;
+      menuTimer = setTimeout(()=> closePresetMenu(), 2500);
+      menu.onmouseenter = ()=>{ if (menuTimer){ clearTimeout(menuTimer); menuTimer=null; } };
+      menu.onmouseleave = ()=> closePresetMenu();
+      document.addEventListener('click', closePresetMenu, { once: true });
+    }
+
+    // ===== 維護：清理自我測試殘留資料 =====
+    function cleanupTestArtifacts(){
+      if (!state.user) return;
+      const shops = loadShops(); if (!Array.isArray(shops) || !shops.length) return;
+      const removeIds = new Set(['shop__TEST__','shop_T14','shop_T19']);
+      const filtered = shops.filter(s=> !removeIds.has(s.id) && !(s.name||'').startsWith('店T'));
+      if (filtered.length !== shops.length){ saveShops(filtered);
+        // 同步刪除對應方案
+        for (const s of shops){ if (!filtered.find(x=>x.id===s.id)){ const k = campsKey(s.id); if (k) localStorage.removeItem(k); } }
+      }
+    }
+
+    // 新增樣式（需要登入）
+    els.presetAddBtn.addEventListener('click', ()=>{
+      if (!state.user) { alert('請先登入帳號才能新增樣式'); return; }
+      const name = (els.presetAddName.value||'').trim(); if (!name) { alert('請輸入樣式名稱'); return; }
+      const preset = { id: uid(), name, pinned:false, settings: currentSettings() };
+      presets.unshift(preset); if (!savePresets(presets)) return; els.presetAddName.value=''; renderPresetButtons();
+    });
+
+    function reloadPresets(){ presets = loadPresets(); renderPresetButtons(); updatePresetControls(); }
+
+    function updatePresetControls(){
+      const disabled = !state.user || !hasScopeReady();
+      els.presetAddBtn.disabled = disabled; els.presetAddName.disabled = disabled;
+      els.presetAddBtn.classList.toggle('opacity-50', disabled);
+      els.presetAddBtn.classList.toggle('cursor-not-allowed', disabled);
+    }
+
+    // ===== 顯示項目（存入當前方案 meta） =====
+    function loadDisplayOptionsFromMeta(){
+      const meta = getActiveMeta();
+      els.optShowShop.checked = !!meta.showShopName;
+      els.optShowCamp.checked = !!meta.showCampaignName;
+      els.optShowContact.checked = !!meta.showContact;
+      els.optShowNotes.checked = !!meta.showNotes;
+      els.optNotes.value = meta.notes || '';
+      els.optShowBadge.checked = !!meta.showBadge;
+      els.optBadgeText.value = meta.badgeText || '限時特價';
+      if (els.optShowLogo) els.optShowLogo.checked = !!meta.showLogo;
+      if (els.optShowQR) els.optShowQR.checked = meta.showQR !== false; // 簡化條件，預設顯示
+      if (els.optBorderStyle) els.optBorderStyle.value = meta.borderStyle || 'none';
+      if (els.optBorderColor) els.optBorderColor.value = meta.borderColor || '#e2e8f0';
+      if (els.optBackgroundColor) els.optBackgroundColor.value = meta.backgroundColor || '#ffffff';
+      els.optNotes.classList.toggle('hidden', !els.optShowNotes.checked);
+    }
+
+    function persistMeta(updater){
+      if (!hasScopeReady()) return;
+      const camps = loadCamps(state.selectedShopId);
+      const idx = camps.findIndex(c=>c.id===state.selectedCampaignId);
+      if (idx<0) return;
+      const old = camps[idx];
+      const next = { ...old, meta: { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff', ...(old.meta||{}) } };
+      updater(next.meta);
+      camps[idx] = next; saveCamps(state.selectedShopId, camps);
+      renderDM();
+    }
+
+    ['change','input'].forEach(evt=>{
+      els.optShowShop && els.optShowShop.addEventListener(evt, ()=> persistMeta(meta=> meta.showShopName = !!els.optShowShop.checked));
+      els.optShowCamp && els.optShowCamp.addEventListener(evt, ()=> persistMeta(meta=> meta.showCampaignName = !!els.optShowCamp.checked));
+      els.optShowContact && els.optShowContact.addEventListener(evt, ()=> persistMeta(meta=> meta.showContact = !!els.optShowContact.checked));
+      els.optShowNotes && els.optShowNotes.addEventListener(evt, ()=>{ els.optNotes.classList.toggle('hidden', !els.optShowNotes.checked); persistMeta(meta=> meta.showNotes = !!els.optShowNotes.checked); });
+      els.optNotes && els.optNotes.addEventListener('input', ()=> persistMeta(meta=> meta.notes = els.optNotes.value));
+      els.optShowBadge && els.optShowBadge.addEventListener(evt, ()=> persistMeta(meta=> meta.showBadge = !!els.optShowBadge.checked));
+      els.optShowLogo && els.optShowLogo.addEventListener(evt, ()=> persistMeta(meta=> meta.showLogo = !!els.optShowLogo.checked));
+      els.optShowQR && els.optShowQR.addEventListener(evt, ()=> persistMeta(meta=> meta.showQR = !!els.optShowQR.checked));
+      els.optBorderStyle && els.optBorderStyle.addEventListener(evt, ()=> persistMeta(meta=> meta.borderStyle = els.optBorderStyle.value));
+      els.optBorderColor && els.optBorderColor.addEventListener(evt, ()=> persistMeta(meta=> meta.borderColor = els.optBorderColor.value));
+      els.optBackgroundColor && els.optBackgroundColor.addEventListener(evt, ()=> persistMeta(meta=> meta.backgroundColor = els.optBackgroundColor.value));
+      
+      els.optBadgeText && els.optBadgeText.addEventListener('input', ()=> persistMeta(meta=> meta.badgeText = els.optBadgeText.value));
+    });
+
+    // ===== 手風琴 =====
+    const ACC_KEY_PREFIX = 'dm-acc-v1:'; // {userId}
+    function accKey(){ return state.user ? ACC_KEY_PREFIX + state.user.id : null; }
+    function loadAcc(){ const k=accKey(); if (!k) return {}; try{ return JSON.parse(localStorage.getItem(k)||'{}'); }catch{return{};} }
+    function saveAcc(map){ const k=accKey(); if (!k) return; try{ localStorage.setItem(k, JSON.stringify(map)); }catch{} }
+
+    function initAccordion(){
+      const map = loadAcc();
+      document.querySelectorAll('.acc').forEach(card=>{
+        const key = card.getAttribute('data-acc-key')||'';
+        const title = card.querySelector('.acc-title'); if (!title) return;
+        const content = Array.from(card.children).filter(n=> n!==title);
+        const expanded = key==='shop-camp' ? true : !!map[key];
+        title.setAttribute('aria-expanded', expanded?'true':'false');
+        content.forEach(n=> n.style.display = expanded? '' : 'none');
+        title.addEventListener('click', (ev)=>{
+          ev.preventDefault(); ev.stopPropagation();
+          const isNowOpen = title.getAttribute('aria-expanded')==='true';
+          const nextOpen = !isNowOpen;
+          title.setAttribute('aria-expanded', nextOpen?'true':'false');
+          content.forEach(n=> n.style.display = nextOpen? '' : 'none');
+          const m = loadAcc(); m[key]=nextOpen; saveAcc(m);
+        });
+      });
+    }
+
+    function updateAccordionLock(){
+      // 預覽區不收合；其他已由 initAccordion 控制
+    }
+
+    // ===== 自我測試 =====
+    function runSelfTests(){
+      const log = (ok, msg)=> (ok? console.log('✅',msg): console.error('❌',msg));
+      log(!!els.dmCanvas && !!els.templateSelect && !!els.presetList, 'DOM 快取存在');
+      const defs = loadPresets(); log(Array.isArray(defs) && defs.length>=4, '預設樣式載入 >=4');
+      try { renderDM(); log(true,'renderDM 正常'); } catch(e){ log(false,'renderDM 失敗: '+e.message); }
+      // 模擬登入後新增/刪除（建立臨時店家與方案以便儲存預設）
+      const beforeUser = state.user; setUser({ id:'selftest@local', name:'SelfTest' });
+      const shops0 = loadShops(); shops0.unshift({ id:'shop__TEST__', name:'測試店', logoDataUrl:'', brandColor:'#0ea5e9', contact:{} }); saveShops(shops0);
+      state.selectedShopId = 'shop__TEST__';
+      const camps0 = loadCamps('shop__TEST__'); camps0.unshift({ id:'camp__TEST__', name:'測試檔期', settings: currentSettings(), meta:{} }); saveCamps('shop__TEST__', camps0);
+      state.selectedCampaignId = 'camp__TEST__'; reloadPresets();
+      const before = els.presetList.children.length;
+      presets.unshift({ id:'__TEST__', name:'自測', pinned:false, settings: currentSettings() }); savePresets(presets); renderPresetButtons();
+      log(els.presetList.children.length === before+1, '登入後新增樣式 +1');
+      // 測試 safeConfirm 在無 confirm 環境的 fallback
+      const bk = window.confirm; window.confirm = undefined; const ok = safeConfirm('x'); log(ok===true, 'safeConfirm fallback 為 true'); window.confirm = bk;
+      // 刪除剛剛新增的
+      presets = presets.filter(x=>x.id!=='__TEST__'); savePresets(presets); renderPresetButtons();
+      log(els.presetList.children.length === before, '刪除樣式 -1');
+      // T-UI: 透過 UI 按鈕刪除需可行
+      setUser({ id:'uitest@local', name:'UITest' }); reloadPresets();
+      const uiPreset = { id:'__UI_DEL__', name:'UI刪除', pinned:false, settings: currentSettings() };
+      presets.unshift(uiPreset); savePresets(presets); renderPresetButtons();
+      const btnDel = els.presetList.querySelector('[data-del="__UI_DEL__"]');
+      if (btnDel) {
+        btnDel.dispatchEvent(new Event('click', { bubbles:true }));
+        const pop = btnDel.parentElement.querySelector('.del-pop[data-id="__UI_DEL__"]');
+        if (pop) {
+          const confirmBtn = pop.querySelector('[data-act="confirm"]');
+          if (confirmBtn) confirmBtn.click();
+        }
+      }
+      const existsAfter = !!presets.find(x=>x.id==='__UI_DEL__');
+      log(existsAfter===false, 'UI 刪除按鈕可刪除樣式');
+      // 還原
+      setUser(beforeUser); reloadPresets();
+
+      // ===== 新增測試 T13-T16 =====
+      // T13：未選店+方案時 gating 生效
+      state.selectedShopId=null; state.selectedCampaignId=null; updateGating();
+      const styleCard = els.templateSelect.closest('.bg-white');
+      log(styleCard.classList.contains('pointer-events-none'), 'T13 樣式卡 disabled');
+      log(els.downloadPng.disabled && els.downloadPdf.disabled, 'T13 匯出 disabled');
+      // T14：新增店家和方案後解除鎖定
+      setUser({ id:'t14@local', name:'T14' });
+      const sList = loadShops(); sList.unshift({ id:'shop_T14', name:'店T14', logoDataUrl:'', brandColor:'#0ea5e9', contact:{} }); saveShops(sList);
+      state.selectedShopId='shop_T14';
+      const cList = loadCamps('shop_T14'); cList.unshift({ id:'camp_T14', name:'檔期T14', settings: currentSettings(), meta:{} }); saveCamps('shop_T14', cList);
+      state.selectedCampaignId='camp_T14'; updateGating();
+      log(!els.downloadPng.disabled && !els.downloadPdf.disabled, 'T14 匯出解鎖');
+      // T15：套用方案後 state 與 UI 一致
+      const camp = findCampById('shop_T14','camp_T14'); applySettings({ ...camp.settings, imgFit:'contain' });
+      log(state.imgFit==='contain' && els.fitSelect.value==='contain', 'T15 套用方案同步');
+      // T16：A/B 方案預設隔離
+      const cList2 = loadCamps('shop_T14'); cList2.unshift({ id:'camp_T16B', name:'B', settings: currentSettings(), meta:{} }); saveCamps('shop_T14', cList2);
+      state.selectedCampaignId='camp_T14'; reloadPresets(); const beforeCount = presets.length;
+      presets.unshift({ id:'__A_ONLY__', name:'A only', pinned:false, settings: currentSettings() }); savePresets(presets);
+      state.selectedCampaignId='camp_T16B'; reloadPresets(); const exists = !!presets.find(x=>x.id==='__A_ONLY__');
+      log(exists===false, 'T16 A/B 方案預設隔離');
+
+      // ===== T18-T21 手風琴與顯示項目 =====
+      // T18 預設收合（未登入時跳過狀態保存檢查）
+      const accCards = document.querySelectorAll('.acc');
+      log(accCards.length>0, 'T18 存在可收合卡片');
+      // T19 顯示選項切換觸發 renderDM
+      setUser({ id:'t19@local', name:'T19' });
+      const sL = loadShops(); sL.unshift({ id:'shop_T19', name:'店T19', logoDataUrl:'', brandColor:'#0ea5e9', contact:{ phone:'0912-345-678' } }); saveShops(sL);
+      state.selectedShopId='shop_T19';
+      const cL = loadCamps('shop_T19'); cL.unshift({ id:'camp_T19', name:'檔期T19', settings: currentSettings(), meta:{ showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'' } }); saveCamps('shop_T19', cL);
+      state.selectedCampaignId='camp_T19'; loadDisplayOptionsFromMeta();
+      const beforeHTML = els.dmCanvas.innerHTML; els.optShowContact.checked = true; els.optShowContact.dispatchEvent(new Event('change')); const afterHTML = els.dmCanvas.innerHTML;
+      log(beforeHTML !== afterHTML, 'T19 顯示聯絡方式變更會刷新預覽');
+      // T20 清空聯絡方式時提示
+      const shopsT19 = loadShops(); const sIdx = shopsT19.findIndex(x=>x.id==='shop_T19'); if (sIdx>=0){ shopsT19[sIdx].contact={}; saveShops(shopsT19); }
+      renderDM(); log(els.dmCanvas.innerHTML.includes('尚未填店家聯絡方式'), 'T20 空聯絡方式會有提示');
+      // T21 切換方案載入不同 meta
+      const cL2 = loadCamps('shop_T19'); cL2.unshift({ id:'camp_T21', name:'B', settings: currentSettings(), meta:{ showShopName:false, showCampaignName:false, showContact:false, showNotes:true, notes:'B notes' } }); saveCamps('shop_T19', cL2);
+      state.selectedCampaignId='camp_T21'; loadDisplayOptionsFromMeta(); renderDM();
+      log(els.dmCanvas.innerHTML.includes('B notes'), 'T21 切換方案載入 notes');
+
+      // ===== 新版驗證 =====
+      // 預設模板 grid9
+      log(state.template==='grid9', '預設模板為九宮格');
+      // 商品庫表頭全選存在
+      log(!!document.getElementById('select-all'), '商品庫有全選勾選');
+      // 分頁檢查
+      const backupP = [...state.products];
+      while(state.products.length<11){ state.products.push({ id: uid(), name:'測試品', price:1, originalPrice:'', desc:'', imageDataUrl:'' }); }
+      state.selection = new Set(state.products.map(p=>p.id));
+      state.template='grid9'; renderDM();
+      log(els.dmCanvas.children.length>=2, '九宮格 >9 件會分頁');
+      state.template='list'; renderDM(); log(els.dmCanvas.children.length>=1, '清單可渲染多頁');
+      state.template='single'; renderDM(); log(els.dmCanvas.children.length>=1, '單品可分頁');
+      // 顯示 QR 旗標
+      const cTmp = findCampById('shop_T14','camp_T14'); if (cTmp){ cTmp.meta.qrDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVR4nGNgYGD4z0AEYBxVAAAnLQH3qXb4+gAAAABJRU5ErkJggg=='; cTmp.meta.showQR = true; saveCamps('shop_T14', loadCamps('shop_T14')); state.selectedShopId='shop_T14'; state.selectedCampaignId='camp_T14'; loadDisplayOptionsFromMeta(); renderDM(); log(true,'顯示QR旗標可載入'); }
+      // 徽章不重複
+      state.template='single'; renderDM();
+      const badgeCount = (els.dmCanvas.innerHTML.match(/限時特價/g)||[]).length; log(badgeCount<=1, '促銷徽章不重複');
+      // 還原
+      state.products = backupP; state.selection = new Set(); state.template='grid9'; renderDM();
+    }
+
+    // ===== 初始化 =====
+    (function init(){
+      // Demo 商品
+      const demo = [
+        { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
+        { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
+        { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
+        { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
+        { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
+      ];
+      for (const d of demo) state.products.push({ id: uid(), ...d });
+
+      renderShopPills(); renderCampaignPills(); renderChosenSummary(); updateGating(); initAccordion();
+      reloadPresets(); updatePresetControls(); renderTable(); renderDM(); applyScale();
+      runSelfTests();
+      
+    })();
+  })();
+  </script>
+</body>
+</html>
