@@ -122,6 +122,7 @@
           <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
           <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
           <button id="reset-user" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-yellow-100">重置用戶</button>
+          <button id="refresh-usage" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-blue-100">刷新次數</button>
         </div>
       </div>
 
@@ -529,6 +530,7 @@
       loginState: document.getElementById('login-state'),
       resetData: document.getElementById('reset-data'),
       resetUser: document.getElementById('reset-user'),
+      refreshUsage: document.getElementById('refresh-usage'),
       // Shops & Campaigns
       shopCard: document.getElementById('shop-camp-card'),
       shopPills: document.getElementById('shop-pill-list'),
@@ -632,7 +634,7 @@
       } else {
         createNewUser();
       }
-      updateUsageDisplay();
+      // updateUsageDisplay() 將在初始化完成後調用
     }
     
     function createNewUser() {
@@ -656,13 +658,24 @@
 
     function updateUsageDisplay() {
       const usageEl = document.getElementById('usage-display');
-      if (usageEl) {
+      console.log('updateUsageDisplay called:', {
+        usageEl: usageEl,
+        user: state.user
+      });
+      
+      if (usageEl && state.user) {
         const remaining = state.user.maxUsage - state.user.usageCount;
         if (state.user.isPremium) {
           usageEl.innerHTML = '<span class="text-green-600 font-semibold">∞ 無限使用</span>';
         } else {
           usageEl.innerHTML = `<span class="text-orange-600">剩餘 ${remaining} 次</span>`;
         }
+        console.log('使用次數顯示已更新:', remaining);
+      } else {
+        console.log('無法更新使用次數顯示:', {
+          usageEl: !!usageEl,
+          user: !!state.user
+        });
       }
     }
 
@@ -1126,11 +1139,20 @@
       try{
         localStorage.removeItem('dm_user');
         initUser();
+        setTimeout(() => {
+          updateUsageDisplay();
+        }, 100);
         toast('用戶數據已重置，使用次數恢復為3次');
       }catch(e){ 
         console.error(e); 
         toast('重置失敗'); 
       }
+    });
+
+    // 刷新使用次數顯示
+    els.refreshUsage.addEventListener('click', ()=>{
+      updateUsageDisplay();
+      toast('使用次數顯示已刷新');
     });
 
     // ===== 圖片處理 =====
@@ -2495,6 +2517,12 @@
 
       renderShopPills(); renderCampaignPills(); renderChosenSummary(); updateGating(); initAccordion();
       reloadPresets(); updatePresetControls(); renderTable(); renderDM(); applyScale();
+      
+      // 確保DOM載入完成後再更新使用次數顯示
+      setTimeout(() => {
+        updateUsageDisplay();
+      }, 100);
+      
       runSelfTests();
       
     })();
