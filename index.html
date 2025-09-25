@@ -739,11 +739,11 @@
       const isSingleFull = state.template === 'singleFull';
       
       let bottomClass = 'bottom-0';
-      // 指定LOGO檔：九宮格使用 DMSD(2).png，其餘維持預設
-      const logoSrc = isGrid9 ? 'DMSD(2).png' : (state.watermark?.logoUrl || 'DMSD.png');
+      // 改回黑色 LOGO，所有模板使用 DMSD.png
+      const logoSrc = state.watermark?.logoUrl || 'DMSD.png';
       if (isGrid9) {
-        // 置於黑條上方 55px（原20再上移35）=> 64 + 55 = 119px
-        bottomClass = 'bottom-[119px]';
+        // 再向下 2px：由 70px → 68px（以選好店家與DM後為基準）
+        bottomClass = 'bottom-[68px]';
       } else if (isSingle) {
         bottomClass = 'bottom-10'; // 向上移動42px (16px + 10px + 10px + 6px)
       } else if (isSingleFull) {
@@ -1980,11 +1980,11 @@
           card.innerHTML = `
             <div class="flex-none bg-slate-100 overflow-hidden high-res-img" style="height:${imgH}px">${productImageDom(p, true)}</div>
             <div class="p-3 flex-1 flex flex-col" style="height:${textH}px;">
-              <div class="text-base font-bold mb-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
-              <div class="text-sm text-slate-600 mb-2 flex-1" style="line-height: 1.2;">${escapeHtml(p.desc||'')}</div>
+              <div class="text-lg font-bold mb-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
+              <div class="text-base text-slate-600 mb-2 flex-1" style="line-height: 1.2;">${escapeHtml(p.desc||'')}</div>
               <div class="flex items-baseline gap-2 mt-auto">
-                <div class="text-xl font-extrabold">${priceTag(p.price)}</div>
-                ${p.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
+                <div class="text-2xl font-extrabold">${priceTag(p.price)}</div>
+                ${p.originalPrice? `<div class='text-base text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
               </div>
             </div>`;
         }
@@ -2016,11 +2016,11 @@
         const row = document.createElement('div'); row.className='grid grid-cols-12 items-start gap-2 p-4';
         row.innerHTML = `
           <div class="col-span-2"><div class='rounded-xl overflow-hidden high-res-img' style='width:4.5rem; aspect-ratio:${state.imgRatio}; ${getBorderStyle(meta)}${getBackgroundStyle(meta)}'>${productImageDom(p, true)}</div></div>
-          <div class="col-span-5 text-lg font-semibold" style="line-height: 1.2;">${escapeHtml(p?.name||'商品')}</div>
-          <div class="col-span-3 text-sm text-slate-600" style="line-height: 1.3;">${escapeHtml(p?.desc||'')}</div>
+          <div class="col-span-5 text-xl font-semibold" style="line-height: 1.2;">${escapeHtml(p?.name||'商品')}</div>
+          <div class="col-span-3 text-base text-slate-600" style="line-height: 1.3;">${escapeHtml(p?.desc||'')}</div>
           <div class="col-span-2 text-right flex flex-col justify-start">
-            <div class="text-3xl font-extrabold">${priceTag(p?.price||0)}</div>
-            ${p?.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
+            <div class="text-4xl font-extrabold">${priceTag(p?.price||0)}</div>
+            ${p?.originalPrice? `<div class='text-base text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
           </div>`;
         list.appendChild(row);
       }
