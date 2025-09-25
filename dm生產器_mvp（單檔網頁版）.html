@@ -118,6 +118,7 @@
           <button id="login-facebook" class="px-3 py-2 rounded-xl bg-sky-600 text-white">Facebook</button>
           <button id="login-line" class="px-3 py-2 rounded-xl bg-green-600 text-white">LINE</button>
           <div class="grow"></div>
+          <span id="usage-display" class="text-sm font-medium"></span>
           <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
           <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
         </div>
@@ -490,7 +491,7 @@
 
     // ===== 狀態 =====
     const state = {
-      user: null, // { id, name }
+      user: null, // { id, name, email, isPremium, usageCount, maxUsage }
       products: [],
       selection: new Set(),
       template: 'grid9',
@@ -503,6 +504,20 @@
       gridImgFrac: 0.6,
       selectedShopId: null,
       selectedCampaignId: null,
+      // 藍星支付設定
+      bluePayConfig: {
+        hashKey: 'aOJQQQboFFK4VcyHmpZR20BGvn6Nod6p',
+        hashIV: 'Pq0fAp1cEnSQhTlC',
+        merchantId: 'your_merchant_id', // 需要從藍星後台獲取
+        notifyUrl: 'https://ww3e23.github.io/DM-/payment-notify.html',
+        returnUrl: 'https://ww3e23.github.io/DM-/payment-success.html'
+      },
+      // 使用限制設定
+      usageLimits: {
+        freeTrial: 3, // 免費試用次數
+        premiumPrice: 299, // 付費價格 (台幣)
+        premiumFeatures: ['unlimited_usage', 'all_templates', 'high_res_export']
+      }
     };
 
     // ===== DOM 快取 =====
@@ -590,6 +605,167 @@
     // Toast 簡易提示
     function ensureToastHost(){ let host = document.getElementById('toast-wrap'); if (!host){ host = document.createElement('div'); host.id='toast-wrap'; document.body.appendChild(host); } return host; }
     function toast(message, ms=1800){ const host=ensureToastHost(); const t=document.createElement('div'); t.className='toast'; t.textContent=message; host.appendChild(t); requestAnimationFrame(()=> t.classList.add('show')); setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=> t.remove(), 250); }, ms); }
+
+    // ===== 用戶管理系統 =====
+    function initUser() {
+      const savedUser = localStorage.getItem('dm_user');
+      if (savedUser) {
+        state.user = JSON.parse(savedUser);
+      } else {
+        // 創建匿名用戶
+        state.user = {
+          id: 'anonymous_' + Date.now(),
+          name: '訪客',
+          email: null,
+          isPremium: false,
+          usageCount: 0,
+          maxUsage: state.usageLimits.freeTrial,
+          createdAt: new Date().toISOString()
+        };
+        saveUser();
+      }
+      updateUsageDisplay();
+    }
+
+    function saveUser() {
+      localStorage.setItem('dm_user', JSON.stringify(state.user));
+    }
+
+    function updateUsageDisplay() {
+      const usageEl = document.getElementById('usage-display');
+      if (usageEl) {
+        const remaining = state.user.maxUsage - state.user.usageCount;
+        if (state.user.isPremium) {
+          usageEl.innerHTML = '<span class="text-green-600 font-semibold">∞ 無限使用</span>';
+        } else {
+          usageEl.innerHTML = `<span class="text-orange-600">剩餘 ${remaining} 次</span>`;
+        }
+      }
+    }
+
+    function checkUsageLimit() {
+      if (state.user.isPremium) return true;
+      return state.user.usageCount < state.user.maxUsage;
+    }
+
+    function incrementUsage() {
+      if (!state.user.isPremium) {
+        state.user.usageCount++;
+        saveUser();
+        updateUsageDisplay();
+      }
+    }
+
+    function unlockPremium() {
+      state.user.isPremium = true;
+      state.user.maxUsage = Infinity;
+      saveUser();
+      updateUsageDisplay();
+      toast('🎉 恭喜！已解鎖高級功能！');
+    }
+
+    // ===== 藍星支付系統 =====
+    function generateBluePayForm(amount, orderId) {
+      const config = state.bluePayConfig;
+      const data = {
+        MerchantID: config.merchantId,
+        MerchantTradeNo: orderId,
+        MerchantTradeDate: new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, ''),
+        PaymentType: 'aio',
+        TotalAmount: amount,
+        TradeDesc: 'DM生產器高級版',
+        ItemName: 'DM生產器高級版',
+        ReturnURL: config.returnUrl,
+        NotifyURL: config.notifyUrl,
+        ClientBackURL: window.location.href,
+        ChoosePayment: 'ALL',
+        EncryptType: 1
+      };
+
+      // 生成檢查碼 (簡化版，實際需要按照藍星API文檔)
+      const checkValue = generateCheckValue(data, config.hashKey, config.hashIV);
+      data.CheckMacValue = checkValue;
+
+      return data;
+    }
+
+    function generateCheckValue(data, hashKey, hashIV) {
+      // 簡化的檢查碼生成，實際需要按照藍星API規範
+      const sortedKeys = Object.keys(data).sort();
+      let queryString = '';
+      sortedKeys.forEach(key => {
+        if (data[key] !== '') {
+          queryString += `${key}=${data[key]}&`;
+        }
+      });
+      queryString = queryString.slice(0, -1);
+      
+      // 實際應該使用AES加密，這裡簡化處理
+      return btoa(queryString + hashKey + hashIV).substring(0, 32);
+    }
+
+    function showPaymentModal() {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+          <h3 class="text-xl font-bold mb-4">升級到高級版</h3>
+          <div class="mb-4">
+            <p class="text-gray-600 mb-2">免費試用次數已用完</p>
+            <p class="text-sm text-gray-500">升級後可享受：</p>
+            <ul class="text-sm text-gray-600 mt-2 space-y-1">
+              <li>• 無限次使用</li>
+              <li>• 所有模板</li>
+              <li>• 高解析度輸出</li>
+            </ul>
+          </div>
+          <div class="flex gap-3">
+            <button id="pay-now" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+              立即付費 NT$ ${state.usageLimits.premiumPrice}
+            </button>
+            <button id="close-modal" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              取消
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      document.getElementById('pay-now').addEventListener('click', () => {
+        processPayment();
+        modal.remove();
+      });
+      
+      document.getElementById('close-modal').addEventListener('click', () => {
+        modal.remove();
+      });
+    }
+
+    function processPayment() {
+      const orderId = 'DM_' + Date.now();
+      const paymentData = generateBluePayForm(state.usageLimits.premiumPrice, orderId);
+      
+      // 創建表單並提交到藍星支付
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'; // 藍星支付網關
+      form.target = '_blank';
+      
+      Object.keys(paymentData).forEach(key => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = paymentData[key];
+        form.appendChild(input);
+      });
+      
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+      
+      toast('正在跳轉到付款頁面...');
+    }
 
     // 在某些環境（內嵌容器/行動瀏覽器）會封鎖 alert/confirm/prompt。
     // 使用安全版 confirm：若不可用則默認通過，避免操作卡住。
@@ -1752,6 +1928,15 @@
       console.log('PNG download clicked');
       if (!hasScopeReady()) { alert('請先選店家與 DM 方案'); return; }
       
+      // 檢查使用限制
+      if (!checkUsageLimit()) {
+        showPaymentModal();
+        return;
+      }
+      
+      // 增加使用次數
+      incrementUsage();
+      
       try {
         const shop = findShopById(state.selectedShopId)?.name||'shop';
         const camp = findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'campaign';
@@ -1846,6 +2031,15 @@
     els.downloadPdf.addEventListener('click', async ()=>{
       console.log('PDF download clicked');
       if (!hasScopeReady()) { alert('請先選店家與 DM 方案'); return; }
+      
+      // 檢查使用限制
+      if (!checkUsageLimit()) {
+        showPaymentModal();
+        return;
+      }
+      
+      // 增加使用次數
+      incrementUsage();
       
       try {
       const { jsPDF } = window.jspdf;
@@ -2242,6 +2436,9 @@
 
     // ===== 初始化 =====
     (function init(){
+      // 初始化用戶管理系統
+      initUser();
+      
       // Demo 商品
       const demo = [
         { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },

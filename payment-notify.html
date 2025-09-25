@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>付款通知處理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
+    <div class="text-center">
+      <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">付款通知處理中</h1>
+      <p class="text-gray-600 mb-6">正在驗證您的付款資訊...</p>
+      
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <p class="text-sm text-blue-800">
+          付款成功後，您將自動解鎖高級功能，包括無限次使用和所有模板。
+        </p>
+      </div>
+      
+      <div class="space-y-3">
+        <button onclick="checkPaymentStatus()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+          檢查付款狀態
+        </button>
+        <button onclick="goToMain()" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+          返回主頁
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 藍星支付通知處理
+    function processPaymentNotification() {
+      // 從URL參數獲取付款資訊
+      const urlParams = new URLSearchParams(window.location.search);
+      const merchantTradeNo = urlParams.get('MerchantTradeNo');
+      const rtnCode = urlParams.get('RtnCode');
+      const rtnMsg = urlParams.get('RtnMsg');
+      
+      console.log('Payment notification received:', {
+        merchantTradeNo,
+        rtnCode,
+        rtnMsg
+      });
+      
+      // 如果付款成功 (RtnCode = 1)
+      if (rtnCode === '1') {
+        // 解鎖用戶的高級功能
+        unlockUserPremium(merchantTradeNo);
+        showSuccessMessage();
+      } else {
+        showErrorMessage(rtnMsg);
+      }
+    }
+    
+    function unlockUserPremium(orderId) {
+      // 從localStorage獲取用戶資訊
+      const savedUser = localStorage.getItem('dm_user');
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        user.isPremium = true;
+        user.maxUsage = Infinity;
+        user.premiumUnlockedAt = new Date().toISOString();
+        user.orderId = orderId;
+        
+        // 保存更新後的用戶資訊
+        localStorage.setItem('dm_user', JSON.stringify(user));
+        
+        console.log('User premium unlocked:', user);
+      }
+    }
+    
+    function showSuccessMessage() {
+      document.querySelector('h1').textContent = '付款成功！';
+      document.querySelector('p').textContent = '您的高級功能已解鎖，現在可以無限次使用DM生產器！';
+      document.querySelector('.bg-green-100').classList.add('animate-pulse');
+    }
+    
+    function showErrorMessage(message) {
+      document.querySelector('h1').textContent = '付款失敗';
+      document.querySelector('p').textContent = message || '付款過程中發生錯誤，請重試。';
+      document.querySelector('.bg-green-100').classList.add('bg-red-100');
+      document.querySelector('svg').classList.add('text-red-600');
+    }
+    
+    function checkPaymentStatus() {
+      // 檢查用戶是否已解鎖高級功能
+      const savedUser = localStorage.getItem('dm_user');
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        if (user.isPremium) {
+          alert('✅ 付款成功！您的高級功能已解鎖！');
+          goToMain();
+        } else {
+          alert('❌ 付款尚未確認，請稍後再試或聯繫客服。');
+        }
+      } else {
+        alert('❌ 找不到用戶資訊，請重新登入。');
+      }
+    }
+    
+    function goToMain() {
+      window.location.href = 'https://ww3e23.github.io/DM-/';
+    }
+    
+    // 頁面載入時自動處理付款通知
+    window.addEventListener('load', processPaymentNotification);
+  </script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>付款成功</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full mx-4">
+    <div class="text-center">
+      <!-- 成功圖標 -->
+      <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+      
+      <!-- 標題 -->
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">🎉 付款成功！</h1>
+      <p class="text-lg text-gray-600 mb-6">感謝您的購買，您的高級功能已解鎖！</p>
+      
+      <!-- 功能說明 -->
+      <div class="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+        <h3 class="text-lg font-semibold text-green-800 mb-3">您現在可以享受：</h3>
+        <ul class="text-left space-y-2 text-green-700">
+          <li class="flex items-center">
+            <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            無限次使用DM生產器
+          </li>
+          <li class="flex items-center">
+            <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            所有模板和功能
+          </li>
+          <li class="flex items-center">
+            <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            高解析度輸出
+          </li>
+          <li class="flex items-center">
+            <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            優先客服支援
+          </li>
+        </ul>
+      </div>
+      
+      <!-- 按鈕 -->
+      <div class="space-y-3">
+        <button onclick="goToMain()" class="w-full bg-green-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-green-700 transition-colors shadow-lg">
+          立即開始使用
+        </button>
+        <button onclick="showReceipt()" class="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+          查看收據
+        </button>
+      </div>
+      
+      <!-- 客服資訊 -->
+      <div class="mt-6 pt-6 border-t border-gray-200">
+        <p class="text-sm text-gray-500">
+          如有任何問題，請聯繫客服
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 頁面載入時自動解鎖用戶功能
+    window.addEventListener('load', function() {
+      unlockUserPremium();
+    });
+    
+    function unlockUserPremium() {
+      // 從localStorage獲取用戶資訊
+      const savedUser = localStorage.getItem('dm_user');
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        user.isPremium = true;
+        user.maxUsage = Infinity;
+        user.premiumUnlockedAt = new Date().toISOString();
+        
+        // 保存更新後的用戶資訊
+        localStorage.setItem('dm_user', JSON.stringify(user));
+        
+        console.log('User premium unlocked:', user);
+      } else {
+        // 如果沒有用戶資訊，創建一個新的
+        const newUser = {
+          id: 'premium_' + Date.now(),
+          name: '高級用戶',
+          email: null,
+          isPremium: true,
+          usageCount: 0,
+          maxUsage: Infinity,
+          premiumUnlockedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem('dm_user', JSON.stringify(newUser));
+        console.log('New premium user created:', newUser);
+      }
+    }
+    
+    function goToMain() {
+      window.location.href = 'https://ww3e23.github.io/DM-/';
+    }
+    
+    function showReceipt() {
+      const savedUser = localStorage.getItem('dm_user');
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        const receiptInfo = `
+付款成功收據
+================
+訂單編號: ${user.orderId || 'DM_' + Date.now()}
+付款時間: ${user.premiumUnlockedAt || new Date().toISOString()}
+付款金額: NT$ 299
+服務內容: DM生產器高級版
+用戶ID: ${user.id}
+        `;
+        alert(receiptInfo);
+      } else {
+        alert('找不到付款資訊');
+      }
+    }
+  </script>
+</body>
+</html>
