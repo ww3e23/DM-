@@ -113,6 +113,8 @@
     <aside class="space-y-4">
       <div class="bg-white rounded-2xl shadow p-4">
         <h2 class="text-lg font-bold mb-3">用戶登入</h2>
+        
+        <!-- 登入表單 -->
         <div id="login-form" class="space-y-3">
           <div>
             <input type="email" id="login-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg text-sm">
@@ -124,8 +126,38 @@
             <button id="login-btn" class="flex-1 px-3 py-2 rounded-xl bg-blue-600 text-white text-sm">登入</button>
             <button id="register-btn" class="flex-1 px-3 py-2 rounded-xl bg-green-600 text-white text-sm">註冊</button>
           </div>
+          
+          <!-- 第三方登入 -->
+          <div class="text-center text-xs text-gray-500">或</div>
+          <button id="google-login-btn" class="w-full px-3 py-2 rounded-xl bg-red-600 text-white text-sm flex items-center justify-center gap-2">
+            <span>🔍</span>
+            Google 登入
+          </button>
+          
+          <!-- 管理員登入 -->
+          <div class="text-center">
+            <button id="admin-login-toggle" class="text-xs text-gray-500 hover:text-gray-700">管理員登入</button>
+          </div>
+          
           <div class="text-center">
             <button id="logout-btn" class="px-3 py-1 rounded-lg border text-xs bg-red-100 text-red-600 hidden">登出</button>
+          </div>
+        </div>
+        
+        <!-- 管理員登入表單 -->
+        <div id="admin-login-form" class="space-y-3 hidden">
+          <div class="text-center">
+            <h3 class="text-md font-semibold text-gray-700">管理員登入</h3>
+          </div>
+          <div>
+            <input type="text" id="admin-username" placeholder="管理員帳號" class="w-full px-3 py-2 border rounded-lg text-sm">
+          </div>
+          <div>
+            <input type="password" id="admin-password" placeholder="管理員密碼" class="w-full px-3 py-2 border rounded-lg text-sm">
+          </div>
+          <div class="flex gap-2">
+            <button id="admin-login-btn" class="flex-1 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm">管理員登入</button>
+            <button id="back-to-normal" class="flex-1 px-3 py-2 rounded-xl bg-gray-600 text-white text-sm">返回</button>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2 mt-3">
@@ -656,6 +688,14 @@
       loginBtn: document.getElementById('login-btn'),
       registerBtn: document.getElementById('register-btn'),
       logoutBtn: document.getElementById('logout-btn'),
+      googleLoginBtn: document.getElementById('google-login-btn'),
+      adminLoginToggle: document.getElementById('admin-login-toggle'),
+      adminLoginForm: document.getElementById('admin-login-form'),
+      adminUsername: document.getElementById('admin-username'),
+      adminPassword: document.getElementById('admin-password'),
+      adminLoginBtn: document.getElementById('admin-login-btn'),
+      backToNormal: document.getElementById('back-to-normal'),
+      loginForm: document.getElementById('login-form'),
       loginState: document.getElementById('login-state'),
       resetData: document.getElementById('reset-data'),
       resetUser: document.getElementById('reset-user'),
@@ -1191,6 +1231,65 @@
       return { success: true, message: '登入成功！', user: user };
     }
     
+    // 管理員登入
+    function loginAdmin(username, password) {
+      if (!username || !password) {
+        return { success: false, message: '請填寫管理員帳號和密碼' };
+      }
+      
+      // 檢查管理員帳號
+      if (username === 'egege5513gegergdsf' && password === 'dgfdgdfgdgf5454') {
+        const adminUser = {
+          id: 'egege5513gegergdsf',
+          email: 'egege5513gegergdsf',
+          name: '管理員',
+          password: 'dgfdgdfgdgf5454',
+          isPremium: true,
+          maxUsage: Infinity,
+          usageCount: 0,
+          isAdmin: true,
+          createdAt: new Date().toISOString()
+        };
+        
+        // 更新用戶狀態
+        state.user = adminUser;
+        saveCurrentUser(adminUser);
+        setUser(adminUser);
+        
+        return { success: true, message: '管理員登入成功！', user: adminUser };
+      } else {
+        return { success: false, message: '管理員帳號或密碼錯誤' };
+      }
+    }
+    
+    // Google 登入（模擬）
+    function loginWithGoogle() {
+      // 模擬Google登入流程
+      const googleUser = {
+        id: 'google_' + Date.now(),
+        email: 'user@gmail.com',
+        name: 'Google用戶',
+        password: '', // Google登入不需要密碼
+        isPremium: false,
+        maxUsage: 10,
+        usageCount: 0,
+        loginType: 'google',
+        createdAt: new Date().toISOString()
+      };
+      
+      // 保存Google用戶到本地
+      const users = getAllUsers();
+      users[googleUser.email] = googleUser;
+      saveUsers(users);
+      
+      // 更新用戶狀態
+      state.user = googleUser;
+      saveCurrentUser(googleUser);
+      setUser(googleUser);
+      
+      return { success: true, message: 'Google登入成功！', user: googleUser };
+    }
+    
     // 用戶登出
     function logoutUser() {
       state.user = null;
@@ -1215,7 +1314,7 @@
         els.registerBtn.disabled = true;
         
         // 顯示管理員按鈕（如果是管理員）
-        if (u.email === 'egege5513gegergdsf') {
+        if (u.isAdmin || u.email === 'egege5513gegergdsf') {
           els.adminPanel.classList.remove('hidden');
         } else {
           els.adminPanel.classList.add('hidden');
@@ -1227,6 +1326,9 @@
         els.registerBtn.disabled = false;
         els.adminPanel.classList.add('hidden');
       }
+      
+      // 更新使用次數顯示
+      updateUsageDisplay();
       
       // 清理測試殘留資料（避免顯示店T19等測試店家）
       try { cleanupTestArtifacts(); renderShopPills(); } catch(e) { console.warn('cleanupTestArtifacts error', e); }
@@ -1541,6 +1643,46 @@
       }
     });
     
+    // Google 登入按鈕事件
+    els.googleLoginBtn.addEventListener('click', () => {
+      const result = loginWithGoogle();
+      if (result.success) {
+        toast(result.message);
+        reloadPresets();
+      } else {
+        toast(result.message);
+      }
+    });
+    
+    // 管理員登入切換
+    els.adminLoginToggle.addEventListener('click', () => {
+      els.loginForm.classList.add('hidden');
+      els.adminLoginForm.classList.remove('hidden');
+    });
+    
+    // 返回普通登入
+    els.backToNormal.addEventListener('click', () => {
+      els.adminLoginForm.classList.add('hidden');
+      els.loginForm.classList.remove('hidden');
+    });
+    
+    // 管理員登入按鈕事件
+    els.adminLoginBtn.addEventListener('click', () => {
+      const username = els.adminUsername.value.trim();
+      const password = els.adminPassword.value;
+      
+      const result = loginAdmin(username, password);
+      if (result.success) {
+        toast(result.message);
+        reloadPresets();
+        // 返回普通登入界面
+        els.adminLoginForm.classList.add('hidden');
+        els.loginForm.classList.remove('hidden');
+      } else {
+        toast(result.message);
+      }
+    });
+    
     // 登出按鈕事件
     els.logoutBtn.addEventListener('click', () => {
       logoutUser();
@@ -1550,6 +1692,13 @@
     els.loginPassword.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         els.loginBtn.click();
+      }
+    });
+    
+    // 管理員密碼Enter鍵登入
+    els.adminPassword.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        els.adminLoginBtn.click();
       }
     });
     
