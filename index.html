@@ -1996,12 +1996,12 @@
 
     // ===== 商品輸入 =====
     let pendingImage = null;
-    els.pickImg.addEventListener('click', () => els.imgInput.click());
+    els.pickImg && els.imgInput && els.pickImg.addEventListener('click', () => els.imgInput.click());
     
     // AI描述生成按鈕
     const aiDescBtn = document.getElementById('ai-desc-btn');
     if (aiDescBtn) {
-      aiDescBtn.addEventListener('click', () => {
+      aiDescBtn && aiDescBtn.addEventListener('click', () => {
         const form = aiDescBtn.closest('form');
         const nameInput = form.querySelector('input[name="name"]');
         const priceInput = form.querySelector('input[name="price"]');
@@ -2039,7 +2039,7 @@
     // 已移除舊的頂部批量AI描述按鈕，統一由商品庫工具列提供
     
     
-    els.imgInput.addEventListener('change', async (e) => {
+    els.imgInput && els.imgInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       try {
@@ -2048,7 +2048,7 @@
       } catch(err){ console.error(err); }
     });
 
-    els.form.addEventListener('submit', (e) => {
+    els.form && els.form.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(els.form);
       const product = {
@@ -2065,7 +2065,7 @@
       renderTable(); renderDM();
     });
 
-    els.csvInput.addEventListener('change', (e) => {
+    els.csvInput && els.csvInput.addEventListener('change', (e) => {
       const file = e.target.files[0]; if (!file) return;
       Papa.parse(file, {
         header: true, skipEmptyLines: true,
@@ -3257,14 +3257,20 @@
         const key = card.getAttribute('data-acc-key')||'';
         const title = card.querySelector('.acc-title'); if (!title) return;
         const content = Array.from(card.children).filter(n=> n!==title);
-        // shop-camp 預設展開，dm-settings 預設收納，其他根據保存的狀態
+        // 預設：shop-camp 展開；dm-settings 收納；其他依原本 aria-expanded 或已保存狀態
         let expanded;
         if (key === 'shop-camp') {
           expanded = true;
         } else if (key === 'dm-settings') {
           expanded = false;
         } else {
-          expanded = !!map[key];
+          const saved = Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+          if (saved === null || saved === undefined) {
+            const attr = title.getAttribute('aria-expanded');
+            expanded = attr ? (attr === 'true') : false;
+          } else {
+            expanded = !!saved;
+          }
         }
         title.setAttribute('aria-expanded', expanded?'true':'false');
         content.forEach(n=> n.style.display = expanded? '' : 'none');
@@ -3282,6 +3288,8 @@
     function updateAccordionLock(){
       // 預覽區不收合；其他已由 initAccordion 控制
     }
+
+    // 取消「保險」：僅保留 initAccordion 內的單一 click 綁定邏輯
 
     // ===== 自我測試 =====
     function runSelfTests(){
@@ -3407,10 +3415,18 @@
             } else {
               state.user = null; setUser(null);
             }
+
+            // 使用者狀態就緒後，確保預設樣式與預覽顯示
+            try { initAccordion(); } catch(e){ console.warn('initAccordion error', e); }
+            try { reloadPresets(); } catch(e){ console.warn('reloadPresets error', e); }
+            try { renderDM(); } catch(e){ console.warn('renderDM error', e); }
           });
         } else {
           // 後備：若 Firebase 尚未可用，保證未登入狀態
           state.user = null; setUser(null);
+          try { initAccordion(); } catch(e){}
+          try { reloadPresets(); } catch(e){}
+          try { renderDM(); } catch(e){}
         }
       } catch (e) {
         console.error('用戶初始化失敗:', e);
