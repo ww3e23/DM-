@@ -969,7 +969,8 @@
       } else if (isSingleFull) {
         bottomClass = 'bottom-5'; // 向上移動5px
       } else if (isList) {
-        bottomClass = 'bottom-[60px]'; // 清單模式也下降到60px
+        // 與九宮格一致
+        bottomClass = 'bottom-[-20px]';
       }
       
       console.log('createWatermark - template:', state.template, 'bottomClass:', bottomClass);
@@ -2461,7 +2462,7 @@
         <div class="absolute inset-0">${p.imageDataUrl?`<div class='w-full h-full' style="background-image:url('${p.imageDataUrl}');background-size:${bgSize};background-position:${bgPos};background-repeat:no-repeat;"></div>`:`<div class='w-full h-full bg-gradient-to-br from-slate-200 to-slate-100'></div>`}</div>
         <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"></div>
         <div class="absolute inset-x-0 top-0 h-20 px-10 flex items-center justify-between text-white relative">
-          <div class="text-3xl font-extrabold tracking-wide drop-shadow">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
+          <div class="text-3xl font-extrabold tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
           ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-white/90 pointer-events-none drop-shadow'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
           <div class="flex items-center gap-2">
             ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white/90'/></div>`:''}
