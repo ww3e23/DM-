@@ -845,22 +845,27 @@
       const isGrid9 = state.template === 'grid9';
       const isSingle = state.template === 'single';
       const isSingleFull = state.template === 'singleFull';
+      const isList = state.template === 'list';
       
       let bottomClass = 'bottom-0';
       // 改回黑色 LOGO，所有模板使用 DMSD.png
       const logoSrc = state.watermark?.logoUrl || 'DMSD.png';
       if (isGrid9) {
-        // 再向下 2px：由 70px → 68px（以選好店家與DM後為基準）
-        bottomClass = 'bottom-[68px]';
+        // 上調40px：從-60px到-20px
+        bottomClass = 'bottom-[-20px]';
+        console.log('九宮格浮水印LOGO位置設置為:', bottomClass);
       } else if (isSingle) {
-        bottomClass = 'bottom-10'; // 向上移動42px (16px + 10px + 10px + 6px)
+        bottomClass = 'bottom-[-20px]'; // 上調40px：從-60px到-20px
       } else if (isSingleFull) {
         bottomClass = 'bottom-5'; // 向上移動5px
+      } else if (isList) {
+        bottomClass = 'bottom-[60px]'; // 清單模式也下降到60px
       }
       
+      console.log('createWatermark - template:', state.template, 'bottomClass:', bottomClass);
       return `
         <div class="absolute ${bottomClass} right-6 z-50">
-          <img src="${logoSrc}" alt="Logo" class="h-24 w-auto drop-shadow-lg" />
+          <img src="${logoSrc}" alt="Logo" class="h-24 w-auto drop-shadow-lg brightness-0 invert" />
         </div>
       `;
     }
@@ -2013,7 +2018,7 @@
             <div class="text-3xl font-extrabold mb-3">${priceTag(p.price)} ${p.originalPrice? `<span class='text-lg text-slate-400 line-through align-middle ml-2'>${priceTag(p.originalPrice)}</span>`:''}</div>
             <div class="text-lg text-slate-600 mb-3 flex-1" style="line-height: 1.3;">${escapeHtml(p.desc||'')}</div>
             <div class="text-sm text-slate-500 mb-4">* 價格變動以當下標示為準</div>
-              ${renderSingleSupplement(meta, shop)}
+            <div class="mt-4">${renderNotesBlock(meta,'light', shop,'mt-2')}</div>
         </div>
         </div>
         <div class="h-16 bg-slate-900/95 text-white flex items-center justify-center text-sm tracking-widest px-4">
@@ -2081,7 +2086,7 @@
           ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-slate-800 pointer-events-none'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
           <div class="flex items-center gap-2">
             ${meta.showBadge? `<div class="px-3 py-1 rounded-full bg-rose-600 text-white text-sm">${escapeHtml(meta.badgeText||'限時特價')}</div>`:''}
-            ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white'/></div>`:''}
+            ${meta.showLogo && shop?.logoDataUrl? `<img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white'/>`:''}
         </div>
         </div>
         <div class="grid grid-cols-3 gap-6 px-10 pb-6 place-content-start" style="min-height:${perCardH*3 + rowGaps}px"></div>
@@ -2091,8 +2096,8 @@
             <div class="col-span-4">${meta.showNotes && (meta.notes||'').trim()!=='' ? `<div class='bg-white rounded-2xl px-6 py-3 text-sm text-slate-800 shadow'>${escapeHtml(meta.notes)}</div>`:''}</div>
             <div class="col-span-2 flex justify-end">${(function(){ 
               const hasQR = !!(meta.qrDataUrl); 
-              const showQR = meta.showQR !== false; // 簡化條件，預設顯示
-              return hasQR && showQR ? `<img src='${meta.qrDataUrl}' class='w-24 h-24 object-contain rounded-lg border'/>` : ''; 
+              const showQR = meta.showQR !== false;
+              return hasQR && showQR ? `<div class='bg-white rounded-2xl shadow p-4'><img src='${meta.qrDataUrl}' class='w-20 h-20 object-contain rounded-lg border'/></div>` : ''; 
             })()}</div>
           </div>
         </div>
@@ -2186,10 +2191,24 @@
       const showContact = !!(meta.showContact && contactLines.length);
       const hasQR = !!(meta.qrDataUrl||'');
       const showQR = meta.showQR !== false; // 簡化條件，預設顯示
-      if (!hasNotes && !showContact && !(hasQR && showQR)) return '';
+      const shouldShowQR = hasQR && showQR;
+      if (!hasNotes && !showContact && !shouldShowQR) return '';
       const note = hasNotes? escapeHtml(meta.notes||'') : '';
       const contactDom = showContact? `<div class='text-xs text-slate-600 mt-2 space-y-1'>${contactLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>` : '';
-      const qr = (hasQR && showQR)? `<img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain ml-4 rounded-lg border'/>` : '';
+      
+      // 根據模板調整QR卡片樣式
+      const isSingle = state.template === 'single';
+      let qr = '';
+      if (shouldShowQR) {
+        if (isSingle) {
+          // 單品左右版：QR卡片適應QR大小
+          qr = `<div class='bg-white rounded-2xl shadow p-2 ml-4'><img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain rounded-lg'/></div>`;
+        } else {
+          // 其他模板：保持原樣
+          qr = `<img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain ml-4 rounded-lg border'/>`;
+        }
+      }
+      
       const base = theme==='glass' ? 'bg-white/40 backdrop-blur-sm text-slate-900' : 'bg-white text-slate-800';
       const extra = extraClass? ` ${extraClass}` : '';
       return `<div class='${base} rounded-2xl px-6 py-3 flex items-center justify-between shadow${extra}'>
@@ -2198,20 +2217,16 @@
       </div>`;
     }
 
-    // 單品：右側欄補充區（上：聯絡；中：說明；右：QR）
+    // 單品：右側欄補充區（上：聯絡；中：說明）
     function renderSingleSupplement(meta, shop){
       const hasNotes = !!(meta.showNotes && (meta.notes||'').trim()!=='');
       const contactLines = meta.showContact ? buildContactLines(shop) : [];
       const hasContact = contactLines.length>0;
-      const hasQR = !!(meta.qrDataUrl||'');
-      const showQR = meta.showQR !== false; // 簡化條件，預設顯示
-      if (!hasNotes && !hasContact && !(hasQR && showQR)) return '';
+      if (!hasNotes && !hasContact) return '';
       const contactDom = hasContact? `<div class='text-xs text-slate-600 space-y-1'>${contactLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>`:'';
       const notesDom = hasNotes? `<div class='mt-2 text-sm text-slate-700'>${escapeHtml(meta.notes||'')}</div>`:'';
-      const qrDom = (hasQR && showQR)? `<img src='${meta.qrDataUrl}' alt='QR' class='w-28 h-28 object-contain rounded-lg border'/>`:'';
-      return `<div class='mt-4 grid grid-cols-3 gap-4 items-start'>
-        <div class='col-span-2'>${contactDom}${!hasNotes && hasContact? '': notesDom}</div>
-        <div class='col-span-1 flex justify-end'>${qrDom}</div>
+      return `<div class='mt-4'>
+        ${contactDom}${!hasNotes && hasContact? '': notesDom}
       </div>`;
     }
 
