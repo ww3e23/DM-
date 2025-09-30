@@ -10,6 +10,8 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- 私密設定：請在專案根目錄建立 config.js（已忽略不會上傳），內容格式見 config.sample.js -->
+  <script src="config.js"></script>
   <script type="module">
     // Firebase 初始化（正式登入）
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -26,14 +28,11 @@
       signOut as fbSignOut
     } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-    const firebaseConfig = {
-      apiKey: 'AIzaSyDFrQoNR6DlU2bN5v8wVdnG2rLACMCUPz4',
-      authDomain: 'dm-generator.firebaseapp.com',
-      projectId: 'dm-generator',
-      storageBucket: 'dm-generator.firebasestorage.app',
-      messagingSenderId: '60913490421',
-      appId: '1:60913490421:web:14cb3ba11423b839bee8bc'
-    };
+    const firebaseConfig = (window.APP_CONFIG && window.APP_CONFIG.firebaseConfig) || null;
+    if (!firebaseConfig) {
+      alert('缺少 config.js 或 firebaseConfig，請複製 config.sample.js 為 config.js 並填入你的 Firebase 設定');
+      throw new Error('Missing firebaseConfig');
+    }
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -1210,9 +1209,19 @@
     //   localStorage.setItem('dm-admin-emails','a@x.com,b@y.com')
     // 仍相容舊的 'dm-admin-email'（單一Email）
     function getAdminEmails(){
-      const list = (localStorage.getItem('dm-admin-emails')||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      const list = [];
+      // 來自 config.js
+      if (window.APP_CONFIG && Array.isArray(window.APP_CONFIG.adminEmails)){
+        window.APP_CONFIG.adminEmails.forEach(e=>{ if (e) list.push(String(e).trim().toLowerCase()); });
+      }
+      // 來自 localStorage（可動態覆蓋/追加）
+      (localStorage.getItem('dm-admin-emails')||'')
+        .split(',')
+        .map(s=>s.trim().toLowerCase())
+        .filter(Boolean)
+        .forEach(e=> list.push(e));
       const legacy = (localStorage.getItem('dm-admin-email')||'').trim().toLowerCase();
-      if (legacy && !list.includes(legacy)) list.push(legacy);
+      if (legacy) list.push(legacy);
       return new Set(list);
     }
     
