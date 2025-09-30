@@ -105,7 +105,11 @@
       // 工具列：新增商品（在表格最上方插入一列可編輯的新商品）
       const btnAddInline = document.getElementById('btn-add-product-inline');
       btnAddInline && btnAddInline.addEventListener('click', ()=>{
+        // 若已存在新增欄，先聚焦名稱欄
+        const exist = els.tbody.querySelector('tr[data-new="1"]');
+        if (exist){ exist.querySelector('input[placeholder="商品名稱"]').focus(); return; }
         const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50';
+        tr.dataset.new = '1';
         const newId = uid();
         tr.innerHTML = `
           <td class="p-2 align-top"></td>
@@ -126,6 +130,7 @@
             <button type="button" class="px-3 py-1 text-xs rounded bg-slate-400 text-white" id="newcancel-${newId}">取消</button>
           </td>`;
         els.tbody.prepend(tr);
+        tr.querySelector('input[placeholder="商品名稱"]').focus();
 
         // 上傳圖片
         document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
@@ -2227,7 +2232,8 @@
       // 工具列：刪除已勾選
       const btnDelSelected = document.getElementById('btn-delete-selected');
       btnDelSelected && btnDelSelected.addEventListener('click', ()=>{
-        if (state.selection.size===0){ alert('請先勾選要刪除的商品'); return; }
+        if (state.products.length===0){ showToast('目前沒有商品'); return; }
+        if (state.selection.size===0){ showToast('請先勾選要刪除的商品'); return; }
         if (!confirm(`確定刪除已勾選的 ${state.selection.size} 項商品？`)) return;
         state.products = state.products.filter(p=> !state.selection.has(p.id));
         state.selection.clear();
@@ -2237,7 +2243,7 @@
       // 工具列：刪除全部
       const btnDelAll = document.getElementById('btn-delete-all');
       btnDelAll && btnDelAll.addEventListener('click', ()=>{
-        if (state.products.length===0){ alert('目前沒有商品'); return; }
+        if (state.products.length===0){ showToast('目前沒有商品'); return; }
         if (!confirm('確定刪除全部商品？此操作無法還原！')) return;
         state.products = []; state.selection.clear();
         renderTable(); renderDM(); showToast('已刪除全部商品');
@@ -2246,8 +2252,9 @@
       // 工具列：為勾選生成AI描述
       const btnAiSelected = document.getElementById('btn-ai-desc-selected');
       btnAiSelected && btnAiSelected.addEventListener('click', ()=>{
+        if (state.products.length===0){ showToast('目前沒有商品'); return; }
         const ids = [...state.selection];
-        if (ids.length===0){ alert('請先勾選商品'); return; }
+        if (ids.length===0){ showToast('請先勾選商品'); return; }
         let updated = 0;
         ids.forEach(id=>{
           const product = state.products.find(p=>p.id===id);
@@ -3289,7 +3296,18 @@
       // 預覽區不收合；其他已由 initAccordion 控制
     }
 
-    // 取消「保險」：僅保留 initAccordion 內的單一 click 綁定邏輯
+    // 補強：全域委派（不影響原邏輯）確保可展開/收納
+    document.addEventListener('click', (ev)=>{
+      const title = ev.target.closest('.acc-title');
+      if (!title) return;
+      const card = title.closest('.acc'); if (!card) return;
+      const content = Array.from(card.children).filter(n=> n!==title);
+      const isOpen = title.getAttribute('aria-expanded')==='true';
+      const nextOpen = !isOpen;
+      title.setAttribute('aria-expanded', nextOpen?'true':'false');
+      content.forEach(n=> n.style.display = nextOpen? '' : 'none');
+      try { const m = loadAcc(); const key = card.getAttribute('data-acc-key')||''; m[key]=nextOpen; saveAcc(m); } catch(e){}
+    });
 
     // ===== 自我測試 =====
     function runSelfTests(){

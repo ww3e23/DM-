@@ -221,6 +221,20 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+    const firebaseConfig = (window.APP_CONFIG && window.APP_CONFIG.firebaseConfig) || null;
+    if (!firebaseConfig) {
+      alert('缺少 config.js 或 firebaseConfig，請回首頁設定後再進入後台');
+      throw new Error('Missing firebase config');
+    }
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    window.__adminAuth = { auth, onAuth: (cb)=> onAuthStateChanged(auth, cb), signOut: ()=> signOut(auth) };
+  </script>
   <script>
     // 常量
     const USERS_KEY = 'dm-users-v1';
@@ -241,13 +255,16 @@
       localStorage.setItem(USERS_KEY, JSON.stringify(users));
     }
 
-    // 獲取當前用戶
-    function getCurrentUser() {
-      try {
-        return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
-      } catch {
-        return null;
+    // 管理員名單（支援多個）：來自 config.js + localStorage 覆蓋/追加
+    function getAdminEmails(){
+      const list = [];
+      if (window.APP_CONFIG && Array.isArray(window.APP_CONFIG.adminEmails)){
+        window.APP_CONFIG.adminEmails.forEach(e=>{ if(e) list.push(String(e).trim().toLowerCase()); });
       }
+      (localStorage.getItem('dm-admin-emails')||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).forEach(e=> list.push(e));
+      const legacy = (localStorage.getItem('dm-admin-email')||'').trim().toLowerCase();
+      if (legacy) list.push(legacy);
+      return new Set(list);
     }
 
     // 顯示提示
@@ -265,15 +282,19 @@
       }, 3000);
     }
 
-    // 檢查管理員權限
-    function checkAdminAccess() {
-      const currentUser = getCurrentUser();
-      if (!currentUser || (!currentUser.isAdmin && currentUser.email !== 'egege5513gegergdsf')) {
-        alert('您沒有管理員權限！');
-        window.location.href = 'index.html';
-        return false;
-      }
-      return true;
+    // 檢查管理員權限（透過 Firebase）
+    function guardAdminThen(run){
+      if (!window.__adminAuth){ alert('驗證服務未就緒'); window.location.href='index.html'; return; }
+      window.__adminAuth.onAuth((user)=>{
+        const email = (user && user.email ? user.email : '').toLowerCase();
+        const admins = getAdminEmails();
+        const ok = !!email && (admins.has(email) || email==='ww3e23@gmail.com');
+        if (!ok){
+          console.warn('Admin check failed', { email, admins: Array.from(admins) });
+          alert('您沒有管理員權限！'); window.location.href='index.html'; return;
+        }
+        run(user);
+      });
     }
 
     // 更新統計數據
@@ -487,11 +508,8 @@
     }
 
     // 初始化
-    function init() {
-      if (!checkAdminAccess()) return;
-      
-      const currentUser = getCurrentUser();
-      document.getElementById('admin-info').textContent = `歡迎，${currentUser.name}`;
+    function initWithUser(currentUser) {
+      document.getElementById('admin-info').textContent = `歡迎，${currentUser.displayName || currentUser.email}`;
       
       // 載入默認設置
       const defaultLimit = localStorage.getItem(DEFAULT_FREE_LIMIT_KEY) || '10';
@@ -555,14 +573,14 @@
       document.getElementById('backup-data-btn').addEventListener('click', backupData);
       document.getElementById('clear-data-btn').addEventListener('click', clearData);
       
-      document.getElementById('logout-btn').addEventListener('click', () => {
-        localStorage.removeItem(CURRENT_USER_KEY);
+      document.getElementById('logout-btn').addEventListener('click', async () => {
+        try { await window.__adminAuth.signOut(); } catch(e){}
         window.location.href = 'index.html';
       });
     }
 
     // 頁面載入時初始化
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', ()=> guardAdminThen(initWithUser));
   </script>
 </body>
 </html>
