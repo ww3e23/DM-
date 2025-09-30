@@ -10,6 +10,53 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script type="module">
+    // Firebase 初始化（正式登入）
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import {
+      getAuth,
+      setPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut as fbSignOut
+    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyDFrQoNR6DlU2bN5v8wVdnG2rLACMCUPz4',
+      authDomain: 'dm-generator.firebaseapp.com',
+      projectId: 'dm-generator',
+      storageBucket: 'dm-generator.firebasestorage.app',
+      messagingSenderId: '60913490421',
+      appId: '1:60913490421:web:14cb3ba11423b839bee8bc'
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // 對外暴露最小 API，供頁面主程式呼叫
+    window.firebaseAuth = {
+      onAuth: (cb) => onAuthStateChanged(auth, cb),
+      signIn: async (email, password, remember) => {
+        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+        return await signInWithEmailAndPassword(auth, email, password);
+      },
+      signUp: async (email, password, remember) => {
+        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+        return await createUserWithEmailAndPassword(auth, email, password);
+      },
+      googleSignIn: async (remember) => {
+        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+        const provider = new GoogleAuthProvider();
+        return await signInWithPopup(auth, provider);
+      },
+      signOut: async () => fbSignOut(auth)
+    };
+  </script>
   <script>
     // 備用QRCode庫載入
     window.addEventListener('load', function() {
@@ -108,68 +155,71 @@
   </style>
 </head>
 <body class="bg-slate-50">
+  <!-- 頂部藍條 -->
+  <div class="bg-blue-100 border-b border-blue-200 py-2 px-4">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+      <div class="text-sm text-blue-800 font-medium">DM 生產器</div>
+      <div class="flex items-center gap-3">
+        <span id="usage-display" class="text-xs text-blue-600"></span>
+        <span id="login-state" class="text-xs text-blue-600">未登入</span>
+        <button id="show-login-modal" class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">登入</button>
+        <button id="show-register-modal" class="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">註冊</button>
+        <button id="logout-btn" class="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 hidden">登出</button>
+        <button id="admin-panel" class="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 hidden" onclick="window.open('admin.html', '_blank')">管理員</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登入彈窗 -->
+  <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 w-80 max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">登入</h3>
+        <button id="close-login-modal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <input type="email" id="login-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg">
+        <input type="password" id="login-password" placeholder="密碼" class="w-full px-3 py-2 border rounded-lg">
+        <div class="flex items-center">
+          <input type="checkbox" id="remember-login" class="mr-2">
+          <label for="remember-login" class="text-sm text-gray-600">維持自動登入</label>
+        </div>
+        <button id="login-btn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">登入</button>
+        <div class="text-center text-sm text-gray-500">或</div>
+        <button id="google-login-btn" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2">
+          <span>🔍</span>
+          Google 登入
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 註冊彈窗 -->
+  <div id="register-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 w-80 max-w-sm mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">註冊</h3>
+        <button id="close-register-modal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <input type="text" id="register-name" placeholder="姓名" class="w-full px-3 py-2 border rounded-lg">
+        <input type="email" id="register-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg">
+        <input type="password" id="register-password" placeholder="密碼" class="w-full px-3 py-2 border rounded-lg">
+        <input type="password" id="register-confirm-password" placeholder="確認密碼" class="w-full px-3 py-2 border rounded-lg">
+        <button id="register-btn" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">註冊</button>
+        <div class="text-center text-sm text-gray-500">或</div>
+        <button id="google-register-btn" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2">
+          <span>🔍</span>
+          Google 註冊
+        </button>
+      </div>
+    </div>
+  </div>
+
+
   <div class="min-h-screen flex flex-col gap-4 p-4 max-w-4xl mx-auto">
     <!-- 左：商品庫 / 匯入 / 模板選擇 -->
     <aside class="space-y-4">
-      <div class="bg-white rounded-2xl shadow p-4">
-        <h2 class="text-lg font-bold mb-3">用戶登入</h2>
-        
-        <!-- 登入表單 -->
-        <div id="login-form" class="space-y-3">
-          <div>
-            <input type="email" id="login-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg text-sm">
-          </div>
-          <div>
-            <input type="password" id="login-password" placeholder="密碼" class="w-full px-3 py-2 border rounded-lg text-sm">
-          </div>
-          <div class="flex gap-2">
-            <button id="login-btn" class="flex-1 px-3 py-2 rounded-xl bg-blue-600 text-white text-sm">登入</button>
-            <button id="register-btn" class="flex-1 px-3 py-2 rounded-xl bg-green-600 text-white text-sm">註冊</button>
-          </div>
-          
-          <!-- 第三方登入 -->
-          <div class="text-center text-xs text-gray-500">或</div>
-          <button id="google-login-btn" class="w-full px-3 py-2 rounded-xl bg-red-600 text-white text-sm flex items-center justify-center gap-2">
-            <span>🔍</span>
-            Google 登入
-          </button>
-          
-          <!-- 管理員登入 -->
-          <div class="text-center">
-            <button id="admin-login-toggle" class="text-xs text-gray-500 hover:text-gray-700">管理員登入</button>
-          </div>
-          
-          <div class="text-center">
-            <button id="logout-btn" class="px-3 py-1 rounded-lg border text-xs bg-red-100 text-red-600 hidden">登出</button>
-          </div>
-        </div>
-        
-        <!-- 管理員登入表單 -->
-        <div id="admin-login-form" class="space-y-3 hidden">
-          <div class="text-center">
-            <h3 class="text-md font-semibold text-gray-700">管理員登入</h3>
-          </div>
-          <div>
-            <input type="text" id="admin-username" placeholder="管理員帳號" class="w-full px-3 py-2 border rounded-lg text-sm">
-          </div>
-          <div>
-            <input type="password" id="admin-password" placeholder="管理員密碼" class="w-full px-3 py-2 border rounded-lg text-sm">
-          </div>
-          <div class="flex gap-2">
-            <button id="admin-login-btn" class="flex-1 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm">管理員登入</button>
-            <button id="back-to-normal" class="flex-1 px-3 py-2 rounded-xl bg-gray-600 text-white text-sm">返回</button>
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 mt-3">
-          <div class="grow"></div>
-          <span id="usage-display" class="text-sm font-medium"></span>
-          <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
-          <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
-          <button id="reset-user" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-yellow-100">重置用戶</button>
-          <button id="refresh-usage" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-blue-100">刷新次數</button>
-          <button id="admin-panel" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-purple-100 hidden">管理員</button>
-        </div>
-      </div>
 
       <!-- 新增：店家與 DM 卡片 -->
       <div class="bg-white rounded-2xl shadow p-4 acc" id="shop-camp-card" data-acc-key="shop-camp">
@@ -683,24 +733,26 @@
 
     // ===== DOM 快取 =====
     const els = {
+      showLoginModal: document.getElementById('show-login-modal'),
+      showRegisterModal: document.getElementById('show-register-modal'),
+      loginModal: document.getElementById('login-modal'),
+      registerModal: document.getElementById('register-modal'),
+      closeLoginModal: document.getElementById('close-login-modal'),
+      closeRegisterModal: document.getElementById('close-register-modal'),
       loginEmail: document.getElementById('login-email'),
       loginPassword: document.getElementById('login-password'),
+      rememberLogin: document.getElementById('remember-login'),
       loginBtn: document.getElementById('login-btn'),
+      registerName: document.getElementById('register-name'),
+      registerEmail: document.getElementById('register-email'),
+      registerPassword: document.getElementById('register-password'),
+      registerConfirmPassword: document.getElementById('register-confirm-password'),
       registerBtn: document.getElementById('register-btn'),
-      logoutBtn: document.getElementById('logout-btn'),
       googleLoginBtn: document.getElementById('google-login-btn'),
-      adminLoginToggle: document.getElementById('admin-login-toggle'),
-      adminLoginForm: document.getElementById('admin-login-form'),
-      adminUsername: document.getElementById('admin-username'),
-      adminPassword: document.getElementById('admin-password'),
-      adminLoginBtn: document.getElementById('admin-login-btn'),
-      backToNormal: document.getElementById('back-to-normal'),
-      loginForm: document.getElementById('login-form'),
-      loginState: document.getElementById('login-state'),
-      resetData: document.getElementById('reset-data'),
-      resetUser: document.getElementById('reset-user'),
-      refreshUsage: document.getElementById('refresh-usage'),
+      googleRegisterBtn: document.getElementById('google-register-btn'),
+      logoutBtn: document.getElementById('logout-btn'),
       adminPanel: document.getElementById('admin-panel'),
+      loginState: document.getElementById('login-state'),
       // Shops & Campaigns
       shopCard: document.getElementById('shop-camp-card'),
       shopPills: document.getElementById('shop-pill-list'),
@@ -834,13 +886,16 @@
       });
       
       if (usageEl && state.user) {
-        const remaining = state.user.maxUsage - state.user.usageCount;
-        if (state.user.isPremium) {
+        const usageCount = state.user.usageCount || 0;
+        const maxUsage = state.user.maxUsage || 10;
+        
+        if (state.user.isPremium || maxUsage === Infinity) {
           usageEl.innerHTML = '<span class="text-green-600 font-semibold">∞ 無限使用</span>';
         } else {
+          const remaining = maxUsage - usageCount;
           usageEl.innerHTML = `<span class="text-orange-600">剩餘 ${remaining} 次</span>`;
         }
-        console.log('使用次數顯示已更新:', remaining);
+        console.log('使用次數顯示已更新:', { usageCount, maxUsage, remaining: maxUsage - usageCount });
       } else {
         console.log('無法更新使用次數顯示:', {
           usageEl: !!usageEl,
@@ -1150,20 +1205,75 @@
     function saveUsers(users) {
       localStorage.setItem(USERS_KEY, JSON.stringify(users));
     }
+    // 讀取管理員Email清單：
+    // 可在瀏覽器 Console 設定：
+    //   localStorage.setItem('dm-admin-emails','a@x.com,b@y.com')
+    // 仍相容舊的 'dm-admin-email'（單一Email）
+    function getAdminEmails(){
+      const list = (localStorage.getItem('dm-admin-emails')||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      const legacy = (localStorage.getItem('dm-admin-email')||'').trim().toLowerCase();
+      if (legacy && !list.includes(legacy)) list.push(legacy);
+      return new Set(list);
+    }
+    
+    // 清除所有登入狀態（用於強制登出）
+    function clearAllLoginStates() {
+      // 清除所有可能的登入相關鍵
+      const keysToRemove = [
+        'dm_current_user',
+        'dm-current-user-v1',
+        'dm-current-user',
+        'current_user',
+        'user_session'
+      ];
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
+      console.log('已清除所有登入狀態');
+    }
     
     // 獲取當前用戶
     function getCurrentUser() {
       try {
-        return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
+        const userData = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
+        if (!userData) return null;
+        
+        // 檢查是否應該自動登出
+        if (!userData.rememberLogin) {
+          // 如果沒有勾選維持自動登入，清除登入狀態
+          localStorage.removeItem(CURRENT_USER_KEY);
+          return null;
+        }
+        
+        // 檢查登入時間是否超過24小時
+        if (userData.loginTime) {
+          const loginTime = new Date(userData.loginTime);
+          const now = new Date();
+          const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
+          if (hoursDiff > 24) {
+            // 超過24小時自動登出
+            localStorage.removeItem(CURRENT_USER_KEY);
+            return null;
+          }
+        }
+        
+        return userData;
       } catch {
         return null;
       }
     }
     
     // 保存當前用戶
-    function saveCurrentUser(user) {
+    function saveCurrentUser(user, rememberLogin = false) {
       if (user) {
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+        const userData = {
+          ...user,
+          rememberLogin: rememberLogin,
+          loginTime: new Date().toISOString()
+        };
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userData));
       } else {
         localStorage.removeItem(CURRENT_USER_KEY);
       }
@@ -1207,7 +1317,7 @@
     }
     
     // 用戶登入
-    function loginUser(email, password) {
+    function loginUser(email, password, rememberLogin = false) {
       if (!email || !password) {
         return { success: false, message: '請填寫電子郵件和密碼' };
       }
@@ -1225,45 +1335,20 @@
       
       // 更新用戶狀態
       state.user = user;
-      saveCurrentUser(user);
+      saveCurrentUser(user, rememberLogin);
       setUser(user);
       
-      return { success: true, message: '登入成功！', user: user };
+      // 檢查是否為管理員
+      if (user.isAdmin || user.email === 'egege5513gegergdsf') {
+        return { success: true, message: `管理員登入成功，歡迎 ${user.name}！`, user: user };
+      } else {
+        return { success: true, message: `歡迎回來，${user.name}！`, user: user };
+      }
     }
     
-    // 管理員登入
-    function loginAdmin(username, password) {
-      if (!username || !password) {
-        return { success: false, message: '請填寫管理員帳號和密碼' };
-      }
-      
-      // 檢查管理員帳號
-      if (username === 'egege5513gegergdsf' && password === 'dgfdgdfgdgf5454') {
-        const adminUser = {
-          id: 'egege5513gegergdsf',
-          email: 'egege5513gegergdsf',
-          name: '管理員',
-          password: 'dgfdgdfgdgf5454',
-          isPremium: true,
-          maxUsage: Infinity,
-          usageCount: 0,
-          isAdmin: true,
-          createdAt: new Date().toISOString()
-        };
-        
-        // 更新用戶狀態
-        state.user = adminUser;
-        saveCurrentUser(adminUser);
-        setUser(adminUser);
-        
-        return { success: true, message: '管理員登入成功！', user: adminUser };
-      } else {
-        return { success: false, message: '管理員帳號或密碼錯誤' };
-      }
-    }
     
     // Google 登入（模擬）
-    function loginWithGoogle() {
+    function loginWithGoogle(rememberLogin = false) {
       // 模擬Google登入流程
       const googleUser = {
         id: 'google_' + Date.now(),
@@ -1284,7 +1369,7 @@
       
       // 更新用戶狀態
       state.user = googleUser;
-      saveCurrentUser(googleUser);
+      saveCurrentUser(googleUser, rememberLogin);
       setUser(googleUser);
       
       return { success: true, message: 'Google登入成功！', user: googleUser };
@@ -1300,31 +1385,27 @@
     
     function setUser(u){
       state.user = u;
-      els.loginState.textContent = u ? scopeString() : '未登入（需登入才能新增樣式/釘選/刪除）';
+      els.loginState && (els.loginState.textContent = u ? scopeString() : '未登入（需登入才能新增樣式/釘選/刪除）');
       updatePresetControls();
       updateAccordionLock();
       
-      // 更新登入表單顯示
+      // 更新頂部藍條顯示
       if (u) {
-        els.loginEmail.value = '';
-        els.loginPassword.value = '';
-        els.logoutBtn.classList.remove('hidden');
-        els.loginBtn.textContent = '已登入';
-        els.loginBtn.disabled = true;
-        els.registerBtn.disabled = true;
+        els.showLoginModal && els.showLoginModal.classList.add('hidden');
+        els.showRegisterModal && els.showRegisterModal.classList.add('hidden');
+        els.logoutBtn && els.logoutBtn.classList.remove('hidden');
         
         // 顯示管理員按鈕（如果是管理員）
-        if (u.isAdmin || u.email === 'egege5513gegergdsf') {
-          els.adminPanel.classList.remove('hidden');
+        if (u.isAdmin || (u.email && getAdminEmails().has(u.email.toLowerCase()))) {
+          els.adminPanel && els.adminPanel.classList.remove('hidden');
         } else {
-          els.adminPanel.classList.add('hidden');
+          els.adminPanel && els.adminPanel.classList.add('hidden');
         }
       } else {
-        els.logoutBtn.classList.add('hidden');
-        els.loginBtn.textContent = '登入';
-        els.loginBtn.disabled = false;
-        els.registerBtn.disabled = false;
-        els.adminPanel.classList.add('hidden');
+        els.showLoginModal && els.showLoginModal.classList.remove('hidden');
+        els.showRegisterModal && els.showRegisterModal.classList.remove('hidden');
+        els.logoutBtn && els.logoutBtn.classList.add('hidden');
+        els.adminPanel && els.adminPanel.classList.add('hidden');
       }
       
       // 更新使用次數顯示
@@ -1610,82 +1691,81 @@
       els.downloadPng.classList.toggle('opacity-50', disabled); els.downloadPdf.classList.toggle('opacity-50', disabled);
     }
 
-    // 登入按鈕事件
-    els.loginBtn.addEventListener('click', () => {
-      const email = els.loginEmail.value.trim();
-      const password = els.loginPassword.value;
-      
-      const result = loginUser(email, password);
-      if (result.success) {
-        toast(result.message);
-        reloadPresets();
-      } else {
-        toast(result.message);
-      }
+    // 顯示登入彈窗
+    els.showLoginModal && els.showLoginModal.addEventListener('click', () => {
+      els.loginModal && els.loginModal.classList.remove('hidden');
     });
     
-    // 註冊按鈕事件
-    els.registerBtn.addEventListener('click', () => {
-      const email = els.loginEmail.value.trim();
-      const password = els.loginPassword.value;
-      const name = prompt('請輸入您的姓名：');
-      
-      if (!name) return;
-      
-      const result = registerUser(email, password, name);
-      if (result.success) {
-        toast(result.message);
-        // 自動登入新註冊的用戶
-        loginUser(email, password);
-        reloadPresets();
-      } else {
-        toast(result.message);
-      }
+    // 顯示註冊彈窗
+    els.showRegisterModal && els.showRegisterModal.addEventListener('click', () => {
+      els.registerModal && els.registerModal.classList.remove('hidden');
     });
     
-    // Google 登入按鈕事件
-    els.googleLoginBtn.addEventListener('click', () => {
-      const result = loginWithGoogle();
-      if (result.success) {
-        toast(result.message);
-        reloadPresets();
-      } else {
-        toast(result.message);
-      }
+    // 關閉登入彈窗
+    els.closeLoginModal && els.closeLoginModal.addEventListener('click', () => {
+      els.loginModal && els.loginModal.classList.add('hidden');
     });
     
-    // 管理員登入切換
-    els.adminLoginToggle.addEventListener('click', () => {
-      els.loginForm.classList.add('hidden');
-      els.adminLoginForm.classList.remove('hidden');
+    // 關閉註冊彈窗
+    els.closeRegisterModal && els.closeRegisterModal.addEventListener('click', () => {
+      els.registerModal && els.registerModal.classList.add('hidden');
     });
     
-    // 返回普通登入
-    els.backToNormal.addEventListener('click', () => {
-      els.adminLoginForm.classList.add('hidden');
-      els.loginForm.classList.remove('hidden');
+    
+    // 登入按鈕事件（Firebase）
+    els.loginBtn && els.loginBtn.addEventListener('click', async () => {
+      const email = els.loginEmail ? els.loginEmail.value.trim() : '';
+      const password = els.loginPassword ? els.loginPassword.value.trim() : '';
+      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
+      if (!email || !password) return toast('請填寫完整資訊');
+      try {
+        await window.firebaseAuth.signIn(email, password, rememberLogin);
+        toast('登入成功');
+        els.loginModal && els.loginModal.classList.add('hidden');
+      } catch(e){ toast(e.message||'登入失敗'); }
     });
     
-    // 管理員登入按鈕事件
-    els.adminLoginBtn.addEventListener('click', () => {
-      const username = els.adminUsername.value.trim();
-      const password = els.adminPassword.value;
-      
-      const result = loginAdmin(username, password);
-      if (result.success) {
-        toast(result.message);
-        reloadPresets();
-        // 返回普通登入界面
-        els.adminLoginForm.classList.add('hidden');
-        els.loginForm.classList.remove('hidden');
-      } else {
-        toast(result.message);
-      }
+    // 註冊按鈕事件（Firebase）
+    els.registerBtn && els.registerBtn.addEventListener('click', async () => {
+      const name = els.registerName.value.trim();
+      const email = els.registerEmail.value.trim();
+      const password = els.registerPassword.value.trim();
+      const confirmPassword = els.registerConfirmPassword.value.trim();
+      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
+      if (!name || !email || !password || !confirmPassword) return toast('請填寫完整資訊');
+      if (password !== confirmPassword) return toast('密碼確認不一致');
+      if (!validatePassword(password)) return toast('密碼長度至少6位');
+      try {
+        await window.firebaseAuth.signUp(email, password, rememberLogin);
+        toast('註冊成功');
+        els.registerModal && els.registerModal.classList.add('hidden');
+      } catch(e){ toast(e.message||'註冊失敗'); }
     });
     
-    // 登出按鈕事件
-    els.logoutBtn.addEventListener('click', () => {
-      logoutUser();
+    // Google 登入（Firebase）
+    els.googleLoginBtn && els.googleLoginBtn.addEventListener('click', async () => {
+      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
+      try {
+        await window.firebaseAuth.googleSignIn(rememberLogin);
+        toast('Google 登入成功');
+        els.loginModal && els.loginModal.classList.add('hidden');
+      } catch(e){ toast(e.message||'Google 登入失敗'); }
+    });
+    
+    // Google 註冊（與登入相同流程）
+    els.googleRegisterBtn && els.googleRegisterBtn.addEventListener('click', async () => {
+      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
+      try {
+        await window.firebaseAuth.googleSignIn(rememberLogin);
+        toast('Google 登入成功');
+        els.registerModal && els.registerModal.classList.add('hidden');
+      } catch(e){ toast(e.message||'Google 登入失敗'); }
+    });
+    
+    
+    // 登出（Firebase）
+    els.logoutBtn && els.logoutBtn.addEventListener('click', async () => {
+      try { await window.firebaseAuth.signOut(); toast('已登出'); } catch(e){ toast('登出失敗'); }
     });
     
     // Enter鍵登入
@@ -1695,56 +1775,36 @@
       }
     });
     
-    // 管理員密碼Enter鍵登入
-    els.adminPassword.addEventListener('keypress', (e) => {
+    // 註冊表單Enter鍵支持
+    els.registerConfirmPassword.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
-        els.adminLoginBtn.click();
+        els.registerBtn.click();
       }
     });
+    
     
     // 管理員面板
     els.adminPanel.addEventListener('click', () => {
       window.open('admin.html', '_blank');
     });
-
-    // 重置本機資料（清空目前帳號相關的 shops/campaigns/presets/accordion）
-    els.resetData.addEventListener('click', ()=>{
-      try{
-        if (!state.user){ localStorage.clear(); location.reload(); return; }
-        const uid = state.user.id;
-        Object.keys(localStorage).forEach(k=>{
-          if (k.startsWith('dm-shops-v1:'+uid) || k.startsWith('dm-campaigns-v1:'+uid) || k.startsWith('dm-presets-v5:'+uid) || k.startsWith('dm-presets-v4:'+uid) || k.startsWith('dm-acc-v1:'+uid)){
-            localStorage.removeItem(k);
-          }
-        });
-        // 也刪除所有該帳號下各店家的 campaigns
-        const shops = loadShops();
-        for (const s of shops){ const k = `dm-campaigns-v1:${uid}:${s.id}`; localStorage.removeItem(k); }
-        // 退出登入，回到初始狀態
-        setUser(null); state.selectedShopId=null; state.selectedCampaignId=null; renderShopPills(); renderCampaignPills(); updateGating(); renderChosenSummary(); reloadPresets(); toast('已重置本機資料');
-      }catch(e){ console.error(e); toast('重置失敗，請手動清除瀏覽器儲存'); }
-    });
-
-    // 重置用戶數據（僅重置使用次數和付費狀態）
-    els.resetUser.addEventListener('click', ()=>{
-      try{
-        localStorage.removeItem('dm_user');
-        initUser();
-        setTimeout(() => {
-          updateUsageDisplay();
-        }, 100);
-        toast('用戶數據已重置，使用次數恢復為3次');
-      }catch(e){ 
-        console.error(e); 
-        toast('重置失敗'); 
+    
+    // 點擊彈窗外部關閉彈窗
+    els.loginModal.addEventListener('click', (e) => {
+      if (e.target === els.loginModal) {
+        els.loginModal.classList.add('hidden');
       }
     });
-
-    // 刷新使用次數顯示
-    els.refreshUsage.addEventListener('click', ()=>{
-      updateUsageDisplay();
-      toast('使用次數顯示已刷新');
+    
+    els.registerModal.addEventListener('click', (e) => {
+      if (e.target === els.registerModal) {
+        els.registerModal.classList.add('hidden');
+      }
     });
+    
+
+    // 重置本機資料（清空目前帳號相關的 shops/campaigns/presets/accordion）
+
+
 
     // ===== 圖片處理 =====
     function fileToDataUrl(file) {
@@ -3151,10 +3211,12 @@
         const key = card.getAttribute('data-acc-key')||'';
         const title = card.querySelector('.acc-title'); if (!title) return;
         const content = Array.from(card.children).filter(n=> n!==title);
-        // shop-camp 和 dm-settings 預設展開，其他根據保存的狀態
+        // shop-camp 預設展開，dm-settings 預設收納，其他根據保存的狀態
         let expanded;
-        if (key === 'shop-camp' || key === 'dm-settings') {
+        if (key === 'shop-camp') {
           expanded = true;
+        } else if (key === 'dm-settings') {
+          expanded = false;
         } else {
           expanded = !!map[key];
         }
@@ -3279,15 +3341,33 @@
     }
 
     // ===== 初始化 =====
-    (function init(){
-      // 初始化用戶系統
-      initUsers();
-      
-      // 檢查是否有已登入的用戶
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        state.user = currentUser;
-        setUser(currentUser);
+    function initApp() {
+      console.log('初始化開始');
+      try {
+        // 以 Firebase onAuthStateChanged 接管登入狀態
+        if (window.firebaseAuth && typeof window.firebaseAuth.onAuth === 'function'){
+          window.firebaseAuth.onAuth((user)=>{
+        if (user){
+              const u = {
+                id: user.uid,
+                email: user.email||'',
+                name: user.displayName||user.email||'用戶',
+                isPremium: false,
+                maxUsage: 10,
+                usageCount: 0,
+            isAdmin: (user.email && getAdminEmails().has((user.email||'').toLowerCase()))
+              };
+              state.user = u; setUser(u);
+            } else {
+              state.user = null; setUser(null);
+            }
+          });
+        } else {
+          // 後備：若 Firebase 尚未可用，保證未登入狀態
+          state.user = null; setUser(null);
+        }
+      } catch (e) {
+        console.error('用戶初始化失敗:', e);
       }
       
       // Demo 商品
@@ -3300,17 +3380,38 @@
       ];
       for (const d of demo) state.products.push({ id: uid(), ...d });
 
-      renderShopPills(); renderCampaignPills(); renderChosenSummary(); updateGating(); initAccordion();
-      reloadPresets(); updatePresetControls(); updateTemplateSettings(); renderTable(); renderDM(); applyScale();
+      try {
+        console.log('開始渲染頁面元素');
+        renderShopPills(); 
+        renderCampaignPills(); 
+        renderChosenSummary(); 
+        updateGating(); 
+        initAccordion();
+        reloadPresets(); 
+        updatePresetControls(); 
+        updateTemplateSettings(); 
+        renderTable(); 
+        renderDM(); 
+        applyScale();
+        console.log('頁面渲染完成');
+      } catch (e) {
+        console.error('頁面渲染失敗:', e);
+      }
       
       // 確保DOM載入完成後再更新使用次數顯示
       setTimeout(() => {
         updateUsageDisplay();
       }, 100);
       
-      runSelfTests();
-      
-    })();
+      // runSelfTests(); // 註解：避免自動模擬登入影響UI顯示
+    }
+    
+    // 等待DOM載入完成後初始化
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
   })();
   </script>
 </body>
