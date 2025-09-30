@@ -112,17 +112,30 @@
     <!-- 左：商品庫 / 匯入 / 模板選擇 -->
     <aside class="space-y-4">
       <div class="bg-white rounded-2xl shadow p-4">
-        <h2 class="text-lg font-bold mb-3">登入（示意，一鍵登入）</h2>
-        <div class="flex flex-wrap items-center gap-2">
-          <button id="login-google" class="px-3 py-2 rounded-xl bg-emerald-600 text-white">Google</button>
-          <button id="login-facebook" class="px-3 py-2 rounded-xl bg-sky-600 text-white">Facebook</button>
-          <button id="login-line" class="px-3 py-2 rounded-xl bg-green-600 text-white">LINE</button>
+        <h2 class="text-lg font-bold mb-3">用戶登入</h2>
+        <div id="login-form" class="space-y-3">
+          <div>
+            <input type="email" id="login-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg text-sm">
+          </div>
+          <div>
+            <input type="password" id="login-password" placeholder="密碼" class="w-full px-3 py-2 border rounded-lg text-sm">
+          </div>
+          <div class="flex gap-2">
+            <button id="login-btn" class="flex-1 px-3 py-2 rounded-xl bg-blue-600 text-white text-sm">登入</button>
+            <button id="register-btn" class="flex-1 px-3 py-2 rounded-xl bg-green-600 text-white text-sm">註冊</button>
+          </div>
+          <div class="text-center">
+            <button id="logout-btn" class="px-3 py-1 rounded-lg border text-xs bg-red-100 text-red-600 hidden">登出</button>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 mt-3">
           <div class="grow"></div>
           <span id="usage-display" class="text-sm font-medium"></span>
           <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
           <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
           <button id="reset-user" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-yellow-100">重置用戶</button>
           <button id="refresh-usage" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-blue-100">刷新次數</button>
+          <button id="admin-panel" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-purple-100 hidden">管理員</button>
         </div>
       </div>
 
@@ -638,13 +651,16 @@
 
     // ===== DOM 快取 =====
     const els = {
-      loginGoogle: document.getElementById('login-google'),
-      loginFacebook: document.getElementById('login-facebook'),
-      loginLINE: document.getElementById('login-line'),
+      loginEmail: document.getElementById('login-email'),
+      loginPassword: document.getElementById('login-password'),
+      loginBtn: document.getElementById('login-btn'),
+      registerBtn: document.getElementById('register-btn'),
+      logoutBtn: document.getElementById('logout-btn'),
       loginState: document.getElementById('login-state'),
       resetData: document.getElementById('reset-data'),
       resetUser: document.getElementById('reset-user'),
       refreshUsage: document.getElementById('refresh-usage'),
+      adminPanel: document.getElementById('admin-panel'),
       // Shops & Campaigns
       shopCard: document.getElementById('shop-camp-card'),
       shopPills: document.getElementById('shop-pill-list'),
@@ -1057,12 +1073,161 @@
       return true;
     }
 
-    // ===== 登入（示意） =====
+    // ===== 真正的登入系統 =====
+    const USERS_KEY = 'dm-users-v1';
+    const CURRENT_USER_KEY = 'dm-current-user-v1';
+    
+    // 初始化用戶數據
+    function initUsers() {
+      if (!localStorage.getItem(USERS_KEY)) {
+        // 創建默認管理員帳號
+        const defaultUsers = {
+          'egege5513gegergdsf': {
+            id: 'egege5513gegergdsf',
+            email: 'egege5513gegergdsf',
+            name: '管理員',
+            password: 'dgfdgdfgdgf5454', // 實際應用中應該加密
+            isPremium: true,
+            maxUsage: Infinity,
+            usageCount: 0,
+            createdAt: new Date().toISOString()
+          }
+        };
+        localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
+      }
+    }
+    
+    // 獲取所有用戶
+    function getAllUsers() {
+      try {
+        return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+    
+    // 保存用戶數據
+    function saveUsers(users) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+    
+    // 獲取當前用戶
+    function getCurrentUser() {
+      try {
+        return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
+      } catch {
+        return null;
+      }
+    }
+    
+    // 保存當前用戶
+    function saveCurrentUser(user) {
+      if (user) {
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+      } else {
+        localStorage.removeItem(CURRENT_USER_KEY);
+      }
+    }
+    
+    // 簡單的密碼驗證（實際應用中應該使用更安全的方法）
+    function validatePassword(password) {
+      return password && password.length >= 6;
+    }
+    
+    // 註冊新用戶
+    function registerUser(email, password, name) {
+      if (!email || !password || !name) {
+        return { success: false, message: '請填寫所有欄位' };
+      }
+      
+      if (!validatePassword(password)) {
+        return { success: false, message: '密碼至少需要6個字符' };
+      }
+      
+      const users = getAllUsers();
+      if (users[email]) {
+        return { success: false, message: '此電子郵件已被註冊' };
+      }
+      
+      const newUser = {
+        id: email,
+        email: email,
+        name: name,
+        password: password, // 實際應用中應該加密
+        isPremium: false,
+        maxUsage: 10, // 免費用戶限制
+        usageCount: 0,
+        createdAt: new Date().toISOString()
+      };
+      
+      users[email] = newUser;
+      saveUsers(users);
+      
+      return { success: true, message: '註冊成功！', user: newUser };
+    }
+    
+    // 用戶登入
+    function loginUser(email, password) {
+      if (!email || !password) {
+        return { success: false, message: '請填寫電子郵件和密碼' };
+      }
+      
+      const users = getAllUsers();
+      const user = users[email];
+      
+      if (!user) {
+        return { success: false, message: '用戶不存在' };
+      }
+      
+      if (user.password !== password) {
+        return { success: false, message: '密碼錯誤' };
+      }
+      
+      // 更新用戶狀態
+      state.user = user;
+      saveCurrentUser(user);
+      setUser(user);
+      
+      return { success: true, message: '登入成功！', user: user };
+    }
+    
+    // 用戶登出
+    function logoutUser() {
+      state.user = null;
+      saveCurrentUser(null);
+      setUser(null);
+      toast('已登出');
+    }
+    
     function setUser(u){
       state.user = u;
       els.loginState.textContent = u ? scopeString() : '未登入（需登入才能新增樣式/釘選/刪除）';
       updatePresetControls();
       updateAccordionLock();
+      
+      // 更新登入表單顯示
+      if (u) {
+        els.loginEmail.value = '';
+        els.loginPassword.value = '';
+        els.logoutBtn.classList.remove('hidden');
+        els.loginBtn.textContent = '已登入';
+        els.loginBtn.disabled = true;
+        els.registerBtn.disabled = true;
+        
+        // 顯示管理員按鈕（如果是管理員）
+        if (u.email === 'egege5513gegergdsf') {
+          els.adminPanel.classList.remove('hidden');
+        } else {
+          els.adminPanel.classList.add('hidden');
+        }
+      } else {
+        els.logoutBtn.classList.add('hidden');
+        els.loginBtn.textContent = '登入';
+        els.loginBtn.disabled = false;
+        els.registerBtn.disabled = false;
+        els.adminPanel.classList.add('hidden');
+      }
+      
       // 清理測試殘留資料（避免顯示店T19等測試店家）
       try { cleanupTestArtifacts(); renderShopPills(); } catch(e) { console.warn('cleanupTestArtifacts error', e); }
     }
@@ -1343,16 +1508,55 @@
       els.downloadPng.classList.toggle('opacity-50', disabled); els.downloadPdf.classList.toggle('opacity-50', disabled);
     }
 
-    function fakeLogin(provider){
-      // 一鍵登入：不使用 prompt，避免被環境封鎖
-      const email = `tester+${provider.toLowerCase()}@local`;
-      setUser({ id: email, name: provider });
-      reloadPresets();
-    }
-
-    els.loginGoogle.addEventListener('click', () => fakeLogin('Google'));
-    els.loginFacebook.addEventListener('click', () => fakeLogin('Facebook'));
-    els.loginLINE.addEventListener('click', () => fakeLogin('LINE'));
+    // 登入按鈕事件
+    els.loginBtn.addEventListener('click', () => {
+      const email = els.loginEmail.value.trim();
+      const password = els.loginPassword.value;
+      
+      const result = loginUser(email, password);
+      if (result.success) {
+        toast(result.message);
+        reloadPresets();
+      } else {
+        toast(result.message);
+      }
+    });
+    
+    // 註冊按鈕事件
+    els.registerBtn.addEventListener('click', () => {
+      const email = els.loginEmail.value.trim();
+      const password = els.loginPassword.value;
+      const name = prompt('請輸入您的姓名：');
+      
+      if (!name) return;
+      
+      const result = registerUser(email, password, name);
+      if (result.success) {
+        toast(result.message);
+        // 自動登入新註冊的用戶
+        loginUser(email, password);
+        reloadPresets();
+      } else {
+        toast(result.message);
+      }
+    });
+    
+    // 登出按鈕事件
+    els.logoutBtn.addEventListener('click', () => {
+      logoutUser();
+    });
+    
+    // Enter鍵登入
+    els.loginPassword.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        els.loginBtn.click();
+      }
+    });
+    
+    // 管理員面板
+    els.adminPanel.addEventListener('click', () => {
+      window.open('admin.html', '_blank');
+    });
 
     // 重置本機資料（清空目前帳號相關的 shops/campaigns/presets/accordion）
     els.resetData.addEventListener('click', ()=>{
@@ -2927,6 +3131,16 @@
 
     // ===== 初始化 =====
     (function init(){
+      // 初始化用戶系統
+      initUsers();
+      
+      // 檢查是否有已登入的用戶
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        state.user = currentUser;
+        setUser(currentUser);
+      }
+      
       // Demo 商品
       const demo = [
         { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },

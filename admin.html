@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DM生產器 - 管理員後台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 1000;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    .toast.show { transform: translateX(0); }
+    .toast.error { background: #ef4444; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="min-h-screen">
+    <!-- 導航欄 -->
+    <nav class="bg-white shadow-sm border-b">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center">
+            <h1 class="text-xl font-bold text-gray-900">DM生產器 - 管理員後台</h1>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span id="admin-info" class="text-sm text-gray-600"></span>
+            <button id="logout-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">登出</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 主要內容 -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <div class="px-4 py-6 sm:px-0">
+        
+        <!-- 統計卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span class="text-white text-sm font-bold">👥</span>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">總用戶數</dt>
+                    <dd id="total-users" class="text-lg font-medium text-gray-900">0</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span class="text-white text-sm font-bold">⭐</span>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">高級會員</dt>
+                    <dd id="premium-users" class="text-lg font-medium text-gray-900">0</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                    <span class="text-white text-sm font-bold">🆓</span>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">免費會員</dt>
+                    <dd id="free-users" class="text-lg font-medium text-gray-900">0</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                    <span class="text-white text-sm font-bold">📊</span>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">總使用次數</dt>
+                    <dd id="total-usage" class="text-lg font-medium text-gray-900">0</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用戶管理 -->
+        <div class="bg-white shadow rounded-lg">
+          <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">用戶管理</h3>
+            
+            <!-- 搜索和篩選 -->
+            <div class="mb-4 flex flex-col sm:flex-row gap-4">
+              <div class="flex-1">
+                <input type="text" id="search-input" placeholder="搜索用戶（姓名或電子郵件）" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <select id="filter-select" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="all">所有用戶</option>
+                <option value="premium">高級會員</option>
+                <option value="free">免費會員</option>
+              </select>
+              <button id="refresh-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">刷新</button>
+            </div>
+
+            <!-- 用戶列表 -->
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用戶信息</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">會員狀態</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用情況</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">註冊時間</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body" class="bg-white divide-y divide-gray-200">
+                  <!-- 用戶數據將在這裡動態生成 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 系統設置 -->
+        <div class="bg-white shadow rounded-lg mt-8">
+          <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">系統設置</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- 默認設置 -->
+              <div>
+                <h4 class="text-md font-medium text-gray-900 mb-3">默認設置</h4>
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">免費用戶使用限制</label>
+                    <input type="number" id="default-free-limit" value="10" min="1" max="1000"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  </div>
+                  <button id="save-defaults-btn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">保存默認設置</button>
+                </div>
+              </div>
+
+              <!-- 批量操作 -->
+              <div>
+                <h4 class="text-md font-medium text-gray-900 mb-3">批量操作</h4>
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">批量設置使用限制</label>
+                    <div class="flex gap-2">
+                      <select id="batch-target" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="free">免費會員</option>
+                        <option value="premium">高級會員</option>
+                        <option value="all">所有用戶</option>
+                      </select>
+                      <input type="number" id="batch-limit" value="10" min="1" max="1000"
+                             class="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                  </div>
+                  <button id="batch-update-btn" class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700">批量更新</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 數據管理 -->
+        <div class="bg-white shadow rounded-lg mt-8">
+          <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">數據管理</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button id="export-data-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                導出用戶數據
+              </button>
+              <button id="backup-data-btn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                備份所有數據
+              </button>
+              <button id="clear-data-btn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                清空所有數據
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 常量
+    const USERS_KEY = 'dm-users-v1';
+    const CURRENT_USER_KEY = 'dm-current-user-v1';
+    const DEFAULT_FREE_LIMIT_KEY = 'dm-default-free-limit';
+
+    // 獲取所有用戶
+    function getAllUsers() {
+      try {
+        return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    // 保存用戶數據
+    function saveUsers(users) {
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+
+    // 獲取當前用戶
+    function getCurrentUser() {
+      try {
+        return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
+      } catch {
+        return null;
+      }
+    }
+
+    // 顯示提示
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      requestAnimationFrame(() => toast.classList.add('show'));
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // 檢查管理員權限
+    function checkAdminAccess() {
+      const currentUser = getCurrentUser();
+      if (!currentUser || currentUser.email !== 'egege5513gegergdsf') {
+        alert('您沒有管理員權限！');
+        window.location.href = 'index.html';
+        return false;
+      }
+      return true;
+    }
+
+    // 更新統計數據
+    function updateStats() {
+      const users = getAllUsers();
+      const userList = Object.values(users);
+      
+      const totalUsers = userList.length;
+      const premiumUsers = userList.filter(u => u.isPremium).length;
+      const freeUsers = totalUsers - premiumUsers;
+      const totalUsage = userList.reduce((sum, u) => sum + (u.usageCount || 0), 0);
+      
+      document.getElementById('total-users').textContent = totalUsers;
+      document.getElementById('premium-users').textContent = premiumUsers;
+      document.getElementById('free-users').textContent = freeUsers;
+      document.getElementById('total-usage').textContent = totalUsage;
+    }
+
+    // 渲染用戶列表
+    function renderUsersList(users = null) {
+      if (!users) {
+        users = getAllUsers();
+      }
+      
+      const searchTerm = document.getElementById('search-input').value.toLowerCase();
+      const filterType = document.getElementById('filter-select').value;
+      
+      let filteredUsers = Object.values(users);
+      
+      // 搜索過濾
+      if (searchTerm) {
+        filteredUsers = filteredUsers.filter(user => 
+          user.name.toLowerCase().includes(searchTerm) || 
+          user.email.toLowerCase().includes(searchTerm)
+        );
+      }
+      
+      // 類型過濾
+      if (filterType === 'premium') {
+        filteredUsers = filteredUsers.filter(user => user.isPremium);
+      } else if (filterType === 'free') {
+        filteredUsers = filteredUsers.filter(user => !user.isPremium);
+      }
+      
+      const tbody = document.getElementById('users-table-body');
+      tbody.innerHTML = '';
+      
+      if (filteredUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">沒有找到用戶</td></tr>';
+        return;
+      }
+      
+      filteredUsers.forEach(user => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <div class="flex-shrink-0 h-10 w-10">
+                <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                  <span class="text-sm font-medium text-gray-700">${user.name.charAt(0).toUpperCase()}</span>
+                </div>
+              </div>
+              <div class="ml-4">
+                <div class="text-sm font-medium text-gray-900">${user.name}</div>
+                <div class="text-sm text-gray-500">${user.email}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.isPremium ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+              ${user.isPremium ? '高級會員' : '免費會員'}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${user.usageCount || 0} / ${user.maxUsage === Infinity ? '∞' : user.maxUsage}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${new Date(user.createdAt).toLocaleDateString()}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <button onclick="editUser('${user.email}')" class="text-blue-600 hover:text-blue-900 mr-3">編輯</button>
+            <button onclick="resetUsage('${user.email}')" class="text-yellow-600 hover:text-yellow-900 mr-3">重置使用</button>
+            <button onclick="togglePremium('${user.email}')" class="text-green-600 hover:text-green-900 mr-3">
+              ${user.isPremium ? '取消高級' : '設為高級'}
+            </button>
+            <button onclick="deleteUser('${user.email}')" class="text-red-600 hover:text-red-900">刪除</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // 編輯用戶
+    function editUser(email) {
+      const users = getAllUsers();
+      const user = users[email];
+      if (!user) return;
+      
+      const newName = prompt('修改姓名:', user.name);
+      if (newName === null) return;
+      
+      const newLimit = prompt('修改使用限制 (輸入數字或 "unlimited"):', user.maxUsage === Infinity ? 'unlimited' : user.maxUsage);
+      if (newLimit === null) return;
+      
+      user.name = newName;
+      if (newLimit === 'unlimited') {
+        user.maxUsage = Infinity;
+        user.isPremium = true;
+      } else {
+        const limit = parseInt(newLimit);
+        if (!isNaN(limit) && limit > 0) {
+          user.maxUsage = limit;
+        }
+      }
+      
+      users[email] = user;
+      saveUsers(users);
+      renderUsersList();
+      updateStats();
+      showToast('用戶信息已更新');
+    }
+
+    // 重置使用次數
+    function resetUsage(email) {
+      if (!confirm('確定要重置此用戶的使用次數嗎？')) return;
+      
+      const users = getAllUsers();
+      const user = users[email];
+      if (!user) return;
+      
+      user.usageCount = 0;
+      users[email] = user;
+      saveUsers(users);
+      renderUsersList();
+      updateStats();
+      showToast('使用次數已重置');
+    }
+
+    // 切換高級會員
+    function togglePremium(email) {
+      const users = getAllUsers();
+      const user = users[email];
+      if (!user) return;
+      
+      user.isPremium = !user.isPremium;
+      user.maxUsage = user.isPremium ? Infinity : (parseInt(localStorage.getItem(DEFAULT_FREE_LIMIT_KEY)) || 10);
+      
+      users[email] = user;
+      saveUsers(users);
+      renderUsersList();
+      updateStats();
+      showToast(`用戶已${user.isPremium ? '設為' : '取消'}高級會員`);
+    }
+
+    // 刪除用戶
+    function deleteUser(email) {
+      if (!confirm('確定要刪除此用戶嗎？此操作無法撤銷！')) return;
+      
+      const users = getAllUsers();
+      delete users[email];
+      saveUsers(users);
+      renderUsersList();
+      updateStats();
+      showToast('用戶已刪除');
+    }
+
+    // 導出數據
+    function exportData() {
+      const users = getAllUsers();
+      const dataStr = JSON.stringify(users, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `dm-users-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast('數據已導出');
+    }
+
+    // 備份數據
+    function backupData() {
+      const allData = {
+        users: getAllUsers(),
+        timestamp: new Date().toISOString(),
+        version: '1.0'
+      };
+      
+      const dataStr = JSON.stringify(allData, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `dm-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast('數據已備份');
+    }
+
+    // 清空數據
+    function clearData() {
+      if (!confirm('確定要清空所有數據嗎？此操作無法撤銷！')) return;
+      if (!confirm('再次確認：這將刪除所有用戶數據！')) return;
+      
+      localStorage.removeItem(USERS_KEY);
+      localStorage.removeItem(CURRENT_USER_KEY);
+      showToast('所有數據已清空');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+
+    // 初始化
+    function init() {
+      if (!checkAdminAccess()) return;
+      
+      const currentUser = getCurrentUser();
+      document.getElementById('admin-info').textContent = `歡迎，${currentUser.name}`;
+      
+      // 載入默認設置
+      const defaultLimit = localStorage.getItem(DEFAULT_FREE_LIMIT_KEY) || '10';
+      document.getElementById('default-free-limit').value = defaultLimit;
+      
+      updateStats();
+      renderUsersList();
+      
+      // 事件監聽器
+      document.getElementById('search-input').addEventListener('input', renderUsersList);
+      document.getElementById('filter-select').addEventListener('change', renderUsersList);
+      document.getElementById('refresh-btn').addEventListener('click', () => {
+        updateStats();
+        renderUsersList();
+        showToast('數據已刷新');
+      });
+      
+      document.getElementById('save-defaults-btn').addEventListener('click', () => {
+        const limit = parseInt(document.getElementById('default-free-limit').value);
+        if (isNaN(limit) || limit < 1) {
+          showToast('請輸入有效的數字', 'error');
+          return;
+        }
+        localStorage.setItem(DEFAULT_FREE_LIMIT_KEY, limit.toString());
+        showToast('默認設置已保存');
+      });
+      
+      document.getElementById('batch-update-btn').addEventListener('click', () => {
+        const target = document.getElementById('batch-target').value;
+        const limit = parseInt(document.getElementById('batch-limit').value);
+        
+        if (isNaN(limit) || limit < 1) {
+          showToast('請輸入有效的數字', 'error');
+          return;
+        }
+        
+        const users = getAllUsers();
+        let updated = 0;
+        
+        Object.values(users).forEach(user => {
+          let shouldUpdate = false;
+          if (target === 'all') shouldUpdate = true;
+          else if (target === 'premium' && user.isPremium) shouldUpdate = true;
+          else if (target === 'free' && !user.isPremium) shouldUpdate = true;
+          
+          if (shouldUpdate) {
+            user.maxUsage = limit;
+            if (limit === Infinity) user.isPremium = true;
+            users[user.email] = user;
+            updated++;
+          }
+        });
+        
+        saveUsers(users);
+        renderUsersList();
+        updateStats();
+        showToast(`已更新 ${updated} 個用戶的使用限制`);
+      });
+      
+      document.getElementById('export-data-btn').addEventListener('click', exportData);
+      document.getElementById('backup-data-btn').addEventListener('click', backupData);
+      document.getElementById('clear-data-btn').addEventListener('click', clearData);
+      
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        localStorage.removeItem(CURRENT_USER_KEY);
+        window.location.href = 'index.html';
+      });
+    }
+
+    // 頁面載入時初始化
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
