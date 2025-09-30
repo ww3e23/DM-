@@ -104,12 +104,10 @@
 
       // 工具列：新增商品（在表格最上方插入一列可編輯的新商品）
       const btnAddInline = document.getElementById('btn-add-product-inline');
-      btnAddInline && btnAddInline.addEventListener('click', ()=>{
-        // 若已存在新增欄，先聚焦名稱欄
+      const createInlineNewRow = ()=>{
         const exist = els.tbody.querySelector('tr[data-new="1"]');
         if (exist){ exist.querySelector('input[placeholder="商品名稱"]').focus(); return; }
-        const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50';
-        tr.dataset.new = '1';
+        const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50'; tr.dataset.new='1';
         const newId = uid();
         tr.innerHTML = `
           <td class="p-2 align-top"></td>
@@ -131,20 +129,16 @@
           </td>`;
         els.tbody.prepend(tr);
         tr.querySelector('input[placeholder="商品名稱"]').focus();
-
-        // 上傳圖片
         document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
           const input = document.createElement('input'); input.type='file'; input.accept='image/*';
           input.onchange = async (ev)=>{
             const file = ev.target.files[0]; if (!file) return;
             const url = await fileToDataUrl(file);
-            document.getElementById(`newimg-${newId}`).innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`;
-            document.getElementById(`newimg-${newId}`).dataset.url = url;
+            const box = document.getElementById(`newimg-${newId}`);
+            box.innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`; box.dataset.url = url;
           };
           input.click();
         });
-
-        // AI 描述
         document.getElementById(`newai-${newId}`).addEventListener('click', ()=>{
           const name = (document.getElementById(`newname-${newId}`).value||'').trim();
           const price = Number(document.getElementById(`newprice-${newId}`).value||0);
@@ -153,21 +147,22 @@
           const ai = generateAIDescription(name, price, ori, img);
           document.getElementById(`newdesc-${newId}`).value = ai; showToast('已生成描述');
         });
-
-        // 取消
         document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
-
-        // 加入
         document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
           const name = (document.getElementById(`newname-${newId}`).value||'').trim();
           const price = Number(document.getElementById(`newprice-${newId}`).value||0);
           const ori = document.getElementById(`newori-${newId}`).value;
           const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
           const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
-          if (!name || !price){ alert('請填寫商品名稱與售價'); return; }
+          if (!name || !price){ showToast('請填寫商品名稱與售價'); return; }
           state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
           tr.remove(); renderTable(); renderDM(); showToast('已新增商品');
         });
+      };
+      // 綁定按鈕與委派（避免重繪遺失事件）
+      btnAddInline && btnAddInline.addEventListener('click', createInlineNewRow);
+      document.getElementById('product-table')?.addEventListener('click', (e)=>{
+        if ((e.target as HTMLElement).id === 'btn-add-product-inline') createInlineNewRow();
       });
     });
   </script>
