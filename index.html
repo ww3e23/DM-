@@ -145,7 +145,7 @@
           const ori = Number(document.getElementById(`newori-${newId}`).value||0) || '';
           const img = document.getElementById(`newimg-${newId}`).dataset.url||null;
           const ai = generateAIDescription(name, price, ori, img);
-          document.getElementById(`newdesc-${newId}`).value = ai; showToast('已生成描述');
+          document.getElementById(`newdesc-${newId}`).value = ai; (window.toast||alert)('已生成描述');
         });
         document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
         document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
@@ -154,9 +154,9 @@
           const ori = document.getElementById(`newori-${newId}`).value;
           const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
           const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
-          if (!name || !price){ showToast('請填寫商品名稱與售價'); return; }
+          if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
           state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
-          tr.remove(); renderTable(); renderDM(); showToast('已新增商品');
+          tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品');
         });
       };
       // 綁定按鈕與委派（避免重繪遺失事件）
@@ -2031,7 +2031,7 @@
           aiDescBtn.disabled = false;
           
           // 顯示成功提示
-          showToast('AI描述生成完成！');
+          (window.toast||alert)('AI描述生成完成！');
         }, 800);
       });
     }
@@ -2152,7 +2152,7 @@
               textarea.style.backgroundColor = '';
             }, 1000);
             
-            showToast('AI描述生成完成！');
+            (window.toast||alert)('AI描述生成完成！');
           }, 600);
         });
       });
@@ -2184,7 +2184,7 @@
             // 重新渲染表格和DM
             renderTable();
             renderDM();
-            showToast('商品已刪除');
+            (window.toast||alert)('商品已刪除');
           }
         });
       });
@@ -2227,29 +2227,29 @@
       // 工具列：刪除已勾選
       const btnDelSelected = document.getElementById('btn-delete-selected');
       btnDelSelected && btnDelSelected.addEventListener('click', ()=>{
-        if (state.products.length===0){ showToast('目前沒有商品'); return; }
-        if (state.selection.size===0){ showToast('請先勾選要刪除的商品'); return; }
+        if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
+        if (state.selection.size===0){ (window.toast||alert)('請先勾選要刪除的商品'); return; }
         if (!confirm(`確定刪除已勾選的 ${state.selection.size} 項商品？`)) return;
         state.products = state.products.filter(p=> !state.selection.has(p.id));
         state.selection.clear();
-        renderTable(); renderDM(); showToast('已刪除勾選商品');
+        renderTable(); renderDM(); (window.toast||alert)('已刪除勾選商品');
       });
 
       // 工具列：刪除全部
       const btnDelAll = document.getElementById('btn-delete-all');
       btnDelAll && btnDelAll.addEventListener('click', ()=>{
-        if (state.products.length===0){ showToast('目前沒有商品'); return; }
+        if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
         if (!confirm('確定刪除全部商品？此操作無法還原！')) return;
         state.products = []; state.selection.clear();
-        renderTable(); renderDM(); showToast('已刪除全部商品');
+        renderTable(); renderDM(); (window.toast||alert)('已刪除全部商品');
       });
 
       // 工具列：為勾選生成AI描述
       const btnAiSelected = document.getElementById('btn-ai-desc-selected');
       btnAiSelected && btnAiSelected.addEventListener('click', ()=>{
-        if (state.products.length===0){ showToast('目前沒有商品'); return; }
+        if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
         const ids = [...state.selection];
-        if (ids.length===0){ showToast('請先勾選商品'); return; }
+        if (ids.length===0){ (window.toast||alert)('請先勾選商品'); return; }
         let updated = 0;
         ids.forEach(id=>{
           const product = state.products.find(p=>p.id===id);
@@ -2257,7 +2257,7 @@
           const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
           product.desc = aiDescription; updated++;
         });
-        renderTable(); showToast(`已為 ${updated} 項商品生成描述`);
+        renderTable(); (window.toast||alert)(`已為 ${updated} 項商品生成描述`);
       });
     }
 
