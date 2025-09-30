@@ -101,6 +101,69 @@
       } else {
         console.log('QRCode庫載入成功');
       }
+
+      // 工具列：新增商品（在表格最上方插入一列可編輯的新商品）
+      const btnAddInline = document.getElementById('btn-add-product-inline');
+      btnAddInline && btnAddInline.addEventListener('click', ()=>{
+        const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50';
+        const newId = uid();
+        tr.innerHTML = `
+          <td class="p-2 align-top"></td>
+          <td class="p-2 align-top">
+            <div class="inline-block rounded-lg overflow-hidden cursor-pointer" id="newimg-${newId}" style="width:4rem;height:4rem;min-width:4rem;background:#f1f5f9;display:grid;place-items:center;">上傳</div>
+          </td>
+          <td class="p-2 align-top"><input class="w-48 border rounded-lg p-1" placeholder="商品名稱" id="newname-${newId}"></td>
+          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="售價" id="newprice-${newId}"></td>
+          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="原價(選填)" id="newori-${newId}"></td>
+          <td class="p-2 align-top">
+            <div class="flex gap-1">
+              <textarea class="flex-1 border rounded-lg p-1" rows="2" placeholder="描述(選填)" id="newdesc-${newId}"></textarea>
+              <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white" id="newai-${newId}">AI</button>
+            </div>
+          </td>
+          <td class="p-2 align-top">
+            <button type="button" class="px-3 py-1 text-xs rounded bg-emerald-600 text-white" id="newsave-${newId}">加入</button>
+            <button type="button" class="px-3 py-1 text-xs rounded bg-slate-400 text-white" id="newcancel-${newId}">取消</button>
+          </td>`;
+        els.tbody.prepend(tr);
+
+        // 上傳圖片
+        document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
+          const input = document.createElement('input'); input.type='file'; input.accept='image/*';
+          input.onchange = async (ev)=>{
+            const file = ev.target.files[0]; if (!file) return;
+            const url = await fileToDataUrl(file);
+            document.getElementById(`newimg-${newId}`).innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`;
+            document.getElementById(`newimg-${newId}`).dataset.url = url;
+          };
+          input.click();
+        });
+
+        // AI 描述
+        document.getElementById(`newai-${newId}`).addEventListener('click', ()=>{
+          const name = (document.getElementById(`newname-${newId}`).value||'').trim();
+          const price = Number(document.getElementById(`newprice-${newId}`).value||0);
+          const ori = Number(document.getElementById(`newori-${newId}`).value||0) || '';
+          const img = document.getElementById(`newimg-${newId}`).dataset.url||null;
+          const ai = generateAIDescription(name, price, ori, img);
+          document.getElementById(`newdesc-${newId}`).value = ai; showToast('已生成描述');
+        });
+
+        // 取消
+        document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
+
+        // 加入
+        document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
+          const name = (document.getElementById(`newname-${newId}`).value||'').trim();
+          const price = Number(document.getElementById(`newprice-${newId}`).value||0);
+          const ori = document.getElementById(`newori-${newId}`).value;
+          const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
+          const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
+          if (!name || !price){ alert('請填寫商品名稱與售價'); return; }
+          state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
+          tr.remove(); renderTable(); renderDM(); showToast('已新增商品');
+        });
+      });
     });
   </script>
   <style>
@@ -344,9 +407,8 @@
         </div>
       </div>
 
-      <!-- 1) 新增商品 -->
-      <div class="bg-white rounded-2xl shadow p-4 acc" data-acc-key="add-product">
-        <h2 class="text-lg font-bold mb-3 acc-title" aria-expanded="false">新增商品 <span class="chev"></span></h2>
+      <!-- 1) 新增商品（改為商品庫內建行新增，不再獨立卡片） -->
+      <div class="hidden" data-acc-key="add-product">
         <form id="product-form" class="space-y-3">
           <input class="w-full rounded-xl border p-2" name="name" placeholder="商品名稱" required />
           <div class="grid grid-cols-2 gap-2">
@@ -373,15 +435,6 @@
           </div>
           <button type="submit" class="w-full py-2 rounded-xl bg-indigo-600 text-white font-semibold">加入商品庫</button>
         </form>
-        
-        <!-- 批量匯入功能 -->
-        <div class="mt-4 pt-4 border-t border-slate-200">
-          <h3 class="text-sm font-semibold mb-2 text-slate-700">批量匯入商品</h3>
-          <p class="text-xs text-slate-600 mb-2">支援 CSV/Excel 格式，欄位：name, price, originalPrice, desc, imageUrl</p>
-          <input type="file" id="csv-input" accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="w-full mb-2" />
-          <button id="btn-download-template" class="w-full py-2 rounded-xl border text-sm hover:bg-slate-50 transition-colors">下載空白範本</button>
-        </div>
-        
       </div>
 
       <!-- DM 製作設定（大項） -->
@@ -597,24 +650,14 @@
         <span class="chev"></span>
       </div>
       <div class="acc-content p-4 pt-0">
-        <!-- AI描述生成工具 -->
-        <div class="mb-4 p-3 bg-blue-50 rounded-xl">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-blue-800">AI描述生成工具</h3>
-            <span class="text-xs text-blue-600">智能生成商品描述</span>
-          </div>
-          <div class="flex gap-2">
-            <button type="button" id="batch-ai-desc" class="w-full py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-              為所有商品生成AI描述
-            </button>
-          </div>
-        </div>
+        
         
         <div id="product-table" class="overflow-auto max-h-[50vh]">
           <div class="flex gap-2 mb-2">
             <button id="btn-delete-selected" class="px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700">刪除已勾選</button>
             <button id="btn-delete-all" class="px-3 py-1 rounded bg-red-700 text-white text-xs hover:bg-red-800">刪除全部</button>
             <button id="btn-ai-desc-selected" class="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">為勾選生成AI描述</button>
+            <button id="btn-add-product-inline" class="px-3 py-1 rounded bg-emerald-600 text-white text-xs hover:bg-emerald-700">新增商品</button>
           </div>
           <table class="w-full text-sm">
             <thead class="sticky top-0 bg-slate-100">
@@ -1993,53 +2036,7 @@
       });
     }
     
-    // 批量AI描述生成
-    const batchAiDescBtn = document.getElementById('batch-ai-desc');
-    if (batchAiDescBtn) {
-      batchAiDescBtn.addEventListener('click', () => {
-        // 找出沒有描述的商品
-        const productsWithoutDesc = state.products.filter(p => !p.desc || p.desc.trim() === '');
-        
-        if (productsWithoutDesc.length === 0) {
-          showToast('所有商品都已有描述！');
-          return;
-        }
-        
-        // 顯示載入狀態
-        batchAiDescBtn.textContent = `正在生成 ${productsWithoutDesc.length} 個描述...`;
-        batchAiDescBtn.disabled = true;
-        
-        // 批量生成描述
-        let completed = 0;
-        productsWithoutDesc.forEach((product, index) => {
-          setTimeout(() => {
-            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
-            product.desc = aiDescription;
-            completed++;
-            
-            // 立即更新該行的顯示
-            const textarea = document.querySelector(`textarea[data-id="${product.id}"]`);
-            if (textarea) {
-              textarea.value = aiDescription;
-              textarea.style.backgroundColor = '#f0f9ff';
-              setTimeout(() => {
-                textarea.style.backgroundColor = '';
-              }, 1000);
-            }
-            
-            if (completed === productsWithoutDesc.length) {
-              // 全部完成
-              batchAiDescBtn.textContent = '為所有商品生成AI描述';
-              batchAiDescBtn.disabled = false;
-              showToast(`成功為 ${productsWithoutDesc.length} 個商品生成描述！`);
-              
-              // 重新渲染DM預覽
-              renderDM();
-            }
-          }, index * 200); // 每個商品間隔200ms，避免太快
-        });
-      });
-    }
+    // 已移除舊的頂部批量AI描述按鈕，統一由商品庫工具列提供
     
     
     els.imgInput.addEventListener('change', async (e) => {
