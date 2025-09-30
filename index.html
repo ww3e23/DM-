@@ -268,8 +268,25 @@
             <button type="button" id="pick-img" class="px-3 py-2 rounded-xl bg-slate-800 text-white">上傳主圖</button>
             <span id="img-name" class="text-sm text-slate-500">尚未選擇</span>
           </div>
+          <div class="text-xs text-slate-500 leading-5 bg-slate-50 rounded-lg p-3">
+            建議圖片比例/尺寸（避免輸出時被拉伸）：
+            <ul class="list-disc pl-5 mt-1 space-y-1">
+              <li>九宮格：建議比例 1:1 或 4:5；建議尺寸 ≥ 1080×1080。</li>
+              <li>清單：建議比例 1:1；建議尺寸 ≥ 800×800（越大越清晰）。</li>
+              <li>單品（左右版）：建議比例 4:5；建議尺寸 ≥ 1200×1500。</li>
+              <li>單品（滿版背景）：固定 4:5（1080×1350），建議上傳 ≥ 1080×1350。</li>
+            </ul>
+          </div>
           <button type="submit" class="w-full py-2 rounded-xl bg-indigo-600 text-white font-semibold">加入商品庫</button>
         </form>
+        
+        <!-- 批量匯入功能 -->
+        <div class="mt-4 pt-4 border-t border-slate-200">
+          <h3 class="text-sm font-semibold mb-2 text-slate-700">批量匯入商品</h3>
+          <p class="text-xs text-slate-600 mb-2">支援 CSV/Excel 格式，欄位：name, price, originalPrice, desc, imageUrl</p>
+          <input type="file" id="csv-input" accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="w-full mb-2" />
+          <button id="btn-download-template" class="w-full py-2 rounded-xl border text-sm hover:bg-slate-50 transition-colors">下載空白範本</button>
+        </div>
         
       </div>
 
@@ -286,7 +303,15 @@
           <button id="preset-add-btn" class="px-3 py-2 rounded-xl bg-indigo-600 text-white">新增</button>
         </div>
         <div id="preset-list" class="flex flex-wrap gap-2"></div>
-        <p class="text-xs text-slate-500 mt-2">四顆制式預設會先顯示。登入後可新增/刪除/釘選（會儲存到帳號）。</p>
+        <div class="text-xs text-slate-500 mt-2 space-y-1">
+          <p>四顆制式預設會先顯示。登入後可新增/刪除/釘選（會儲存到帳號）。</p>
+          <p class="text-blue-600 font-medium">💡 新增樣式會包含：</p>
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li>模板與圖片樣式設定（模板類型、圖片填充、對齊、比例等）</li>
+            <li>DM顯示項目設定（店家名稱、方案名稱、聯絡方式、說明、徽章、邊框等）</li>
+            <li>所有模板專用設定（九宮格、單品、清單的專用選項）</li>
+          </ul>
+        </div>
           </div>
       </div>
 
@@ -358,17 +383,91 @@
               <option value="right">靠右</option>
             </select>
           </div>
+          <!-- 單品左右版專用設定 -->
+          <div id="single-settings" class="hidden">
           <div>
-            <label class="block text-sm text-slate-600">圖片框比例（單品/清單）</label>
-            <select id="ratio-select" class="w-full rounded-xl border p-2">
+              <label class="block text-sm text-slate-600">圖片顯示比例</label>
+              <select id="single-img-ratio" class="w-full rounded-xl border p-2">
               <option value="1/1">1:1（正方）</option>
               <option value="4/5" selected>4:5（IG 推薦）</option>
               <option value="3/4">3:4</option>
               <option value="16/9">16:9（橫式）</option>
             </select>
           </div>
+            <div>
+              <label class="block text-sm text-slate-600">卡片顯示比例</label>
+              <select id="single-card-ratio" class="w-full rounded-xl border p-2">
+                <option value="0.4">40%</option>
+                <option value="0.5" selected>50%</option>
+                <option value="0.6">60%</option>
+                <option value="0.7">70%</option>
+              </select>
         </div>
-        <div class="mt-4 space-y-2">
+            <div>
+              <label class="block text-sm text-slate-600">文字顯示比例</label>
+              <select id="single-text-ratio" class="w-full rounded-xl border p-2">
+                <option value="0.3">30%</option>
+                <option value="0.4" selected>40%</option>
+                <option value="0.5">50%</option>
+                <option value="0.6">60%</option>
+              </select>
+            </div>
+          </div>
+          <!-- 單品滿版專用設定 -->
+          <div id="singlefull-settings" class="hidden">
+            <div>
+              <label class="block text-sm text-slate-600">圖片顯示比例</label>
+              <select id="singlefull-img-ratio" class="w-full rounded-xl border p-2">
+                <option value="1/1">1:1（正方）</option>
+                <option value="4/5" selected>4:5（IG 推薦）</option>
+                <option value="3/4">3:4</option>
+                <option value="16/9">16:9（橫式）</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-slate-600">字體比例調整</label>
+              <select id="singlefull-font-ratio" class="w-full rounded-xl border p-2">
+                <option value="0.8">80%</option>
+                <option value="0.9">90%</option>
+                <option value="1.0" selected>100%</option>
+                <option value="1.1">110%</option>
+                <option value="1.2">120%</option>
+              </select>
+            </div>
+          </div>
+          <!-- 清單專用設定 -->
+          <div id="list-settings" class="hidden">
+            <div>
+              <label class="block text-sm text-slate-600">圖片顯示比例</label>
+              <select id="list-img-ratio" class="w-full rounded-xl border p-2">
+                <option value="1/1" selected>1:1（正方）</option>
+                <option value="4/5">4:5（IG 推薦）</option>
+                <option value="3/4">3:4</option>
+                <option value="16/9">16:9（橫式）</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-slate-600">圖卡顯示比例</label>
+              <select id="list-card-ratio" class="w-full rounded-xl border p-2">
+                <option value="0.15">15%</option>
+                <option value="0.2" selected>20%</option>
+                <option value="0.25">25%</option>
+                <option value="0.3">30%</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-slate-600">文字顯示比例</label>
+              <select id="list-text-ratio" class="w-full rounded-xl border p-2">
+                <option value="0.4">40%</option>
+                <option value="0.5" selected>50%</option>
+                <option value="0.6">60%</option>
+                <option value="0.7">70%</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <!-- 九宮格專用設定 -->
+        <div id="grid9-settings" class="mt-4 space-y-2 hidden">
           <label class="block text-sm text-slate-600">（九宮格）卡片高度</label>
           <select id="grid-card-h" class="w-full rounded-xl border p-2">
             <option value="320">小（320px）</option>
@@ -382,22 +481,18 @@
             <option value="0.6" selected>60%</option>
             <option value="0.7">70%</option>
           </select>
+          <label class="block text-sm text-slate-600 mt-2">（九宮格）文字顯示比例</label>
+          <select id="grid-text-ratio" class="w-full rounded-xl border p-2">
+            <option value="0.3">30%</option>
+            <option value="0.4" selected>40%</option>
+            <option value="0.5">50%</option>
+            <option value="0.6">60%</option>
+          </select>
           <label class="inline-flex items-center gap-2 text-sm"><input id="grid-fill" type="checkbox" class="rounded" checked> 不足 9 件以空白卡補齊（固定 3×3）</label>
         </div>
         </div>
       </div>
 
-        <!-- 5) 批量匯入（移到模板樣式下方，並新增「下載範本」） -->
-        <div class="acc" data-acc-key="csv-import">
-          <h3 class="text-base font-semibold mb-2 acc-title" aria-expanded="false">批量匯入（CSV/Excel）<span class="chev"></span></h3>
-          <div>
-        <p class="text-sm text-slate-600 mb-2">欄位：name, price, originalPrice, desc, imageUrl</p>
-        <input type="file" id="csv-input" accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-        <div class="mt-2">
-          <button id="btn-download-template" class="px-3 py-2 rounded-xl border text-sm">下載空白範本</button>
-        </div>
-          </div>
-        </div>
       </div>
     </aside>
 
@@ -415,11 +510,8 @@
             <span class="text-xs text-blue-600">智能生成商品描述</span>
           </div>
           <div class="flex gap-2">
-            <button type="button" id="batch-ai-desc" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+            <button type="button" id="batch-ai-desc" class="w-full py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
               為所有商品生成AI描述
-            </button>
-            <button type="button" id="ai-desc-selected" class="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
-              為選中商品生成
             </button>
           </div>
         </div>
@@ -434,6 +526,7 @@
                 <th class="p-2 text-left">售價</th>
                 <th class="p-2 text-left">原價</th>
                 <th class="p-2 text-left">描述</th>
+                <th class="p-2 text-left">操作</th>
               </tr>
             </thead>
             <tbody id="product-tbody"></tbody>
@@ -491,6 +584,9 @@
   (function(){
     'use strict';
 
+    // ===== 全域常數 =====
+    const PRESET_KEY_PREFIX = 'dm-presets-v4:'; // 每個帳號一份（只讀用）
+
     // ===== 狀態 =====
     const state = {
       user: null, // { id, name, email, isPremium, usageCount, maxUsage }
@@ -504,6 +600,18 @@
       gridCardH: 360,
       gridFill: true,
       gridImgFrac: 0.6,
+      gridTextRatio: 0.4,
+      // 單品左右版設定
+      singleImgRatio: '4/5',
+      singleCardRatio: 0.5,
+      singleTextRatio: 0.4,
+      // 單品滿版設定
+      singlefullImgRatio: '4/5',
+      singlefullFontRatio: 1.0,
+      // 清單設定
+      listImgRatio: '1/1',
+      listCardRatio: 0.2,
+      listTextRatio: 0.5,
       selectedShopId: null,
       selectedCampaignId: null,
       // 藍星支付設定
@@ -1213,11 +1321,19 @@
 
     function updateGating(){
       const disabled = !hasScopeReady();
-      // 樣式卡、預設樣式卡、顯示項目卡：僅鎖內容，不鎖標題列
+      const hasShop = !!state.selectedShopId;
+      const hasCampaign = !!state.selectedCampaignId;
+      
+      // DM製作設定區：有店家就可以使用
+      setCardLocked(document.querySelector('[data-acc-key="dm-settings"]'), !hasShop);
+      
+      // 樣式卡、預設樣式卡、顯示項目卡：需要店家和方案都選好
       setCardLocked(els.templateSelect.closest('.acc'), disabled);
       setCardLocked(els.presetList.closest('.acc'), disabled);
       setCardLocked(document.querySelector('[data-acc-key="dm-display"]'), disabled);
-      // 匯出
+      
+      
+      // 匯出：需要店家和方案都選好
       els.downloadPng.disabled = disabled; els.downloadPdf.disabled = disabled;
       els.downloadPng.classList.toggle('opacity-50', disabled); els.downloadPdf.classList.toggle('opacity-50', disabled);
     }
@@ -1492,55 +1608,6 @@
       });
     }
     
-    // 為選中商品生成AI描述
-    const aiDescSelectedBtn = document.getElementById('ai-desc-selected');
-    if (aiDescSelectedBtn) {
-      aiDescSelectedBtn.addEventListener('click', () => {
-        // 找出選中且沒有描述的商品
-        const selectedProducts = state.products.filter(p => 
-          state.selection.has(p.id) && (!p.desc || p.desc.trim() === '')
-        );
-        
-        if (selectedProducts.length === 0) {
-          showToast('選中的商品都已有描述！');
-          return;
-        }
-        
-        // 顯示載入狀態
-        aiDescSelectedBtn.textContent = `正在生成 ${selectedProducts.length} 個描述...`;
-        aiDescSelectedBtn.disabled = true;
-        
-        // 批量生成描述
-        let completed = 0;
-        selectedProducts.forEach((product, index) => {
-          setTimeout(() => {
-            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
-            product.desc = aiDescription;
-            completed++;
-            
-            // 立即更新該行的顯示
-            const textarea = document.querySelector(`textarea[data-id="${product.id}"]`);
-            if (textarea) {
-              textarea.value = aiDescription;
-              textarea.style.backgroundColor = '#f0f9ff';
-              setTimeout(() => {
-                textarea.style.backgroundColor = '';
-              }, 1000);
-            }
-            
-            if (completed === selectedProducts.length) {
-              // 全部完成
-              aiDescSelectedBtn.textContent = '為選中商品生成';
-              aiDescSelectedBtn.disabled = false;
-              showToast(`成功為 ${selectedProducts.length} 個選中商品生成描述！`);
-              
-              // 重新渲染DM預覽
-              renderDM();
-            }
-          }, index * 200); // 每個商品間隔200ms，避免太快
-        });
-      });
-    }
     
     els.imgInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -1617,8 +1684,11 @@
           <td class="p-2 align-top">
             <div class="flex gap-1">
               <textarea class="flex-1 border rounded-lg p-1" rows="2" data-edit="desc" data-id="${p.id}">${escapeHtml(p.desc)}</textarea>
-              <button type="button" class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ai-desc-single" data-id="${p.id}" title="AI生成描述">AI</button>
+              <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ai-desc-single" data-id="${p.id}" title="AI生成描述">AI</button>
             </div>
+          </td>
+          <td class="p-2 align-top">
+            <button type="button" class="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors delete-product" data-id="${p.id}" title="刪除商品">刪除</button>
           </td>`;
         els.tbody.appendChild(tr);
       }
@@ -1668,6 +1738,26 @@
           renderDM();
         });
       });
+      
+      // 刪除商品按鈕
+      els.tbody.querySelectorAll('.delete-product').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const productId = e.target.dataset.id;
+          const product = state.products.find(p => p.id === productId);
+          if (!product) return;
+          
+          if (confirm(`確定要刪除商品「${product.name}」嗎？`)) {
+            // 從商品列表中移除
+            state.products = state.products.filter(p => p.id !== productId);
+            // 從選擇中移除
+            state.selection.delete(productId);
+            // 重新渲染表格和DM
+            renderTable();
+            renderDM();
+            showToast('商品已刪除');
+          }
+        });
+      });
 
       // 點縮圖重新上傳
       els.tbody.querySelectorAll('[data-reupload]').forEach(box=>{
@@ -1706,13 +1796,53 @@
     }
 
     // ===== 模板渲染 =====
-    els.templateSelect.addEventListener('change', ()=>{ state.template = els.templateSelect.value; renderDM(); });
-    els.fitSelect.addEventListener('change', ()=>{ state.imgFit = els.fitSelect.value; renderDM(); });
-    els.posSelect.addEventListener('change', ()=>{ state.imgPos = els.posSelect.value; renderDM(); });
-    els.ratioSelect.addEventListener('change', ()=>{ state.imgRatio = els.ratioSelect.value; renderDM(); });
-    els.gridCardH.addEventListener('change', ()=>{ state.gridCardH = Number(els.gridCardH.value); renderDM(); });
-    els.gridFill.addEventListener('change', ()=>{ state.gridFill = els.gridFill.checked; renderDM(); });
-    els.gridImgFrac.addEventListener('change', ()=>{ state.gridImgFrac = Number(els.gridImgFrac.value); renderDM(); });
+    els.templateSelect.addEventListener('change', ()=>{ 
+      state.template = els.templateSelect.value; 
+      updateTemplateSettings();
+      renderDM(); 
+    });
+    
+    // 更新模板專用設定顯示
+    function updateTemplateSettings() {
+      const template = state.template;
+      
+      // 隱藏所有專用設定
+      document.getElementById('single-settings').classList.add('hidden');
+      document.getElementById('singlefull-settings').classList.add('hidden');
+      document.getElementById('list-settings').classList.add('hidden');
+      document.getElementById('grid9-settings').classList.add('hidden');
+      
+      // 顯示對應的專用設定
+      if (template === 'single') {
+        document.getElementById('single-settings').classList.remove('hidden');
+      } else if (template === 'singleFull') {
+        document.getElementById('singlefull-settings').classList.remove('hidden');
+      } else if (template === 'list') {
+        document.getElementById('list-settings').classList.remove('hidden');
+      } else if (template === 'grid9') {
+        document.getElementById('grid9-settings').classList.remove('hidden');
+      }
+    }
+    els.fitSelect && els.fitSelect.addEventListener('change', ()=>{ state.imgFit = els.fitSelect.value; renderDM(); });
+    els.posSelect && els.posSelect.addEventListener('change', ()=>{ state.imgPos = els.posSelect.value; renderDM(); });
+    els.ratioSelect && els.ratioSelect.addEventListener('change', ()=>{ state.imgRatio = els.ratioSelect.value; renderDM(); });
+    els.gridCardH && els.gridCardH.addEventListener('change', ()=>{ state.gridCardH = Number(els.gridCardH.value); renderDM(); });
+    els.gridFill && els.gridFill.addEventListener('change', ()=>{ state.gridFill = els.gridFill.checked; renderDM(); });
+    els.gridImgFrac && els.gridImgFrac.addEventListener('change', ()=>{ state.gridImgFrac = Number(els.gridImgFrac.value); renderDM(); });
+    
+    // 新增的模板專用設定事件監聽器
+    document.getElementById('single-img-ratio')?.addEventListener('change', ()=>{ state.singleImgRatio = document.getElementById('single-img-ratio').value; renderDM(); });
+    document.getElementById('single-card-ratio')?.addEventListener('change', ()=>{ state.singleCardRatio = Number(document.getElementById('single-card-ratio').value); renderDM(); });
+    document.getElementById('single-text-ratio')?.addEventListener('change', ()=>{ state.singleTextRatio = Number(document.getElementById('single-text-ratio').value); renderDM(); });
+    
+    document.getElementById('singlefull-img-ratio')?.addEventListener('change', ()=>{ state.singlefullImgRatio = document.getElementById('singlefull-img-ratio').value; renderDM(); });
+    document.getElementById('singlefull-font-ratio')?.addEventListener('change', ()=>{ state.singlefullFontRatio = Number(document.getElementById('singlefull-font-ratio').value); renderDM(); });
+    
+    document.getElementById('list-img-ratio')?.addEventListener('change', ()=>{ state.listImgRatio = document.getElementById('list-img-ratio').value; renderDM(); });
+    document.getElementById('list-card-ratio')?.addEventListener('change', ()=>{ state.listCardRatio = Number(document.getElementById('list-card-ratio').value); renderDM(); });
+    document.getElementById('list-text-ratio')?.addEventListener('change', ()=>{ state.listTextRatio = Number(document.getElementById('list-text-ratio').value); renderDM(); });
+    
+    document.getElementById('grid-text-ratio')?.addEventListener('change', ()=>{ state.gridTextRatio = Number(document.getElementById('grid-text-ratio').value); renderDM(); });
 
     function renderDM(){
       const wrap = els.dmCanvas; wrap.innerHTML='';
@@ -2019,8 +2149,8 @@
           <div class="col-span-5 text-xl font-semibold" style="line-height: 1.2;">${escapeHtml(p?.name||'商品')}</div>
           <div class="col-span-3 text-base text-slate-600" style="line-height: 1.3;">${escapeHtml(p?.desc||'')}</div>
           <div class="col-span-2 text-right flex flex-col justify-start">
-            <div class="text-4xl font-extrabold">${priceTag(p?.price||0)}</div>
-            ${p?.originalPrice? `<div class='text-base text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
+            <div class="text-3xl font-extrabold">${priceTag(p?.price||0)}</div>
+            ${p?.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
           </div>`;
         list.appendChild(row);
       }
@@ -2344,7 +2474,6 @@
     els.zoomRange.addEventListener('input', (e)=>{ state.preview.fit=false; state.preview.scale = Number(e.target.value); els.zoomVal.textContent = Math.round(state.preview.scale*100)+'%'; applyScale(); });
 
     // ===== 預設樣式（帳號儲存） =====
-    const PRESET_KEY_PREFIX = 'dm-presets-v4:'; // 每個帳號一份（只讀用）
 
     function defaultPresets(){
       return [
@@ -2358,21 +2487,42 @@
     function storageKeyV4(){ return state.user ? PRESET_KEY_PREFIX + state.user.id : null; }
 
     function loadPresets(){
-      // 未登入或尚未選擇範圍：僅顯示內建預設
-      if (!state.user || !hasScopeReady()) return defaultPresets();
+      // 未登入：僅顯示內建預設
+      if (!state.user) return defaultPresets();
+      
+      // 如果有選擇店家和方案，載入該方案的預設樣式
+      if (state.selectedShopId && state.selectedCampaignId) {
       const keyV5 = presetsV5Key(state.selectedShopId, state.selectedCampaignId);
       try {
         const raw = keyV5 ? localStorage.getItem(keyV5) : null;
         const arr = raw ? JSON.parse(raw) : [];
         if (Array.isArray(arr) && arr.length>0) return arr;
       } catch(err){ console.warn('讀取 v5 預設失敗', err); }
-      // fallback：顯示內建預設（也可選擇讀 v4，但不寫回）
+      }
+      
+      // 嘗試載入通用保存的預設樣式
+      const keyV4 = storageKeyV4();
+      if (keyV4) {
+        try {
+          const raw = localStorage.getItem(keyV4);
+          const arr = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(arr) && arr.length>0) return arr;
+        } catch(err){ console.warn('讀取 v4 預設失敗', err); }
+      }
+      
+      // fallback：顯示內建預設
       return defaultPresets();
     }
 
     function savePresets(list){
       if (!state.user){ alert('請先登入帳號才能儲存樣式'); return false; }
-      if (!hasScopeReady()){ return false; }
+      if (!state.selectedShopId || !state.selectedCampaignId){ 
+        // 如果沒有選擇店家和方案，使用通用key保存
+        const key = storageKeyV4();
+        if (!key) return false;
+        try { localStorage.setItem(key, JSON.stringify(list)); return true; }
+        catch(err){ console.error('寫入失敗', err); alert('儲存失敗：瀏覽器可能封鎖了儲存空間'); return false; }
+      }
       const key = presetsV5Key(state.selectedShopId, state.selectedCampaignId);
       try { localStorage.setItem(key, JSON.stringify(list)); return true; }
       catch(err){ console.error('寫入失敗', err); alert('儲存失敗：瀏覽器可能封鎖了儲存空間'); return false; }
@@ -2409,13 +2559,101 @@
     }
 
     function currentSettings(){
+      const meta = getActiveMeta();
       return {
-        template: state.template, imgFit: state.imgFit, imgPos: state.imgPos, imgRatio: state.imgRatio,
-        gridCardH: state.gridCardH, gridFill: state.gridFill, gridImgFrac: state.gridImgFrac,
+        // 模板與圖片樣式設定
+        template: state.template, 
+        imgFit: state.imgFit, 
+        imgPos: state.imgPos, 
+        imgRatio: state.imgRatio,
+        gridCardH: state.gridCardH, 
+        gridFill: state.gridFill, 
+        gridImgFrac: state.gridImgFrac,
+        gridTextRatio: state.gridTextRatio,
+        // 單品左右版設定
+        singleImgRatio: state.singleImgRatio,
+        singleCardRatio: state.singleCardRatio,
+        singleTextRatio: state.singleTextRatio,
+        // 單品滿版設定
+        singlefullImgRatio: state.singlefullImgRatio,
+        singlefullFontRatio: state.singlefullFontRatio,
+        // 清單設定
+        listImgRatio: state.listImgRatio,
+        listCardRatio: state.listCardRatio,
+        listTextRatio: state.listTextRatio,
+        // DM顯示項目設定
+        showShopName: meta.showShopName,
+        showCampaignName: meta.showCampaignName,
+        showContact: meta.showContact,
+        showNotes: meta.showNotes,
+        notes: meta.notes,
+        showBadge: meta.showBadge,
+        badgeText: meta.badgeText,
+        showLogo: meta.showLogo,
+        showQR: meta.showQR,
+        borderStyle: meta.borderStyle,
+        borderColor: meta.borderColor,
+        backgroundColor: meta.backgroundColor,
       };
     }
 
-    function applySettings(s){ if (!s) return; state.template=s.template??state.template; els.templateSelect.value=state.template; state.imgFit=s.imgFit??state.imgFit; els.fitSelect.value=state.imgFit; state.imgPos=s.imgPos??state.imgPos; els.posSelect.value=state.imgPos; state.imgRatio=s.imgRatio??state.imgRatio; els.ratioSelect.value=state.imgRatio; state.gridCardH=s.gridCardH??state.gridCardH; els.gridCardH.value=String(state.gridCardH); state.gridFill=s.gridFill??state.gridFill; els.gridFill.checked=!!state.gridFill; state.gridImgFrac=s.gridImgFrac??state.gridImgFrac; els.gridImgFrac.value=String(state.gridImgFrac); renderDM(); }
+    function applySettings(s){ 
+      if (!s) return; 
+      
+      // 套用模板與圖片樣式設定
+      state.template = s.template ?? state.template; 
+      els.templateSelect && (els.templateSelect.value = state.template); 
+      state.imgFit = s.imgFit ?? state.imgFit; 
+      els.fitSelect && (els.fitSelect.value = state.imgFit); 
+      state.imgPos = s.imgPos ?? state.imgPos; 
+      els.posSelect && (els.posSelect.value = state.imgPos); 
+      state.imgRatio = s.imgRatio ?? state.imgRatio; 
+      els.ratioSelect && (els.ratioSelect.value = state.imgRatio); 
+      state.gridCardH = s.gridCardH ?? state.gridCardH; 
+      els.gridCardH && (els.gridCardH.value = String(state.gridCardH)); 
+      state.gridFill = s.gridFill ?? state.gridFill; 
+      els.gridFill && (els.gridFill.checked = !!state.gridFill); 
+      state.gridImgFrac = s.gridImgFrac ?? state.gridImgFrac; 
+      els.gridImgFrac && (els.gridImgFrac.value = String(state.gridImgFrac));
+      
+      // 套用新增的模板專用設定
+      state.gridTextRatio = s.gridTextRatio ?? state.gridTextRatio;
+      state.singleImgRatio = s.singleImgRatio ?? state.singleImgRatio;
+      state.singleCardRatio = s.singleCardRatio ?? state.singleCardRatio;
+      state.singleTextRatio = s.singleTextRatio ?? state.singleTextRatio;
+      state.singlefullImgRatio = s.singlefullImgRatio ?? state.singlefullImgRatio;
+      state.singlefullFontRatio = s.singlefullFontRatio ?? state.singlefullFontRatio;
+      state.listImgRatio = s.listImgRatio ?? state.listImgRatio;
+      state.listCardRatio = s.listCardRatio ?? state.listCardRatio;
+      state.listTextRatio = s.listTextRatio ?? state.listTextRatio;
+      
+      // 套用DM顯示項目設定到當前方案
+      if (state.selectedShopId && state.selectedCampaignId) {
+        const c = findCampById(state.selectedShopId, state.selectedCampaignId);
+        if (c) {
+          c.meta = {
+            ...c.meta,
+            showShopName: s.showShopName ?? c.meta.showShopName,
+            showCampaignName: s.showCampaignName ?? c.meta.showCampaignName,
+            showContact: s.showContact ?? c.meta.showContact,
+            showNotes: s.showNotes ?? c.meta.showNotes,
+            notes: s.notes ?? c.meta.notes,
+            showBadge: s.showBadge ?? c.meta.showBadge,
+            badgeText: s.badgeText ?? c.meta.badgeText,
+            showLogo: s.showLogo ?? c.meta.showLogo,
+            showQR: s.showQR ?? c.meta.showQR,
+            borderStyle: s.borderStyle ?? c.meta.borderStyle,
+            borderColor: s.borderColor ?? c.meta.borderColor,
+            backgroundColor: s.backgroundColor ?? c.meta.backgroundColor,
+          };
+          saveCamps(state.selectedShopId, loadCamps(state.selectedShopId));
+          loadDisplayOptionsFromMeta();
+        }
+      }
+      
+      updateTemplateSettings();
+      renderDM(); 
+    }
 
     function sortPresetsForView(list){ return list.slice().sort((a,b)=> (b.pinned?1:0)-(a.pinned?1:0)); }
 
@@ -2481,7 +2719,7 @@
     function reloadPresets(){ presets = loadPresets(); renderPresetButtons(); updatePresetControls(); }
 
     function updatePresetControls(){
-      const disabled = !state.user || !hasScopeReady();
+      const disabled = !state.user;
       els.presetAddBtn.disabled = disabled; els.presetAddName.disabled = disabled;
       els.presetAddBtn.classList.toggle('opacity-50', disabled);
       els.presetAddBtn.classList.toggle('cursor-not-allowed', disabled);
@@ -2506,7 +2744,7 @@
     }
 
     function persistMeta(updater){
-      if (!hasScopeReady()) return;
+      if (!state.selectedShopId || !state.selectedCampaignId) return;
       const camps = loadCamps(state.selectedShopId);
       const idx = camps.findIndex(c=>c.id===state.selectedCampaignId);
       if (idx<0) return;
@@ -2545,7 +2783,13 @@
         const key = card.getAttribute('data-acc-key')||'';
         const title = card.querySelector('.acc-title'); if (!title) return;
         const content = Array.from(card.children).filter(n=> n!==title);
-        const expanded = key==='shop-camp' ? true : !!map[key];
+        // shop-camp 和 dm-settings 預設展開，其他根據保存的狀態
+        let expanded;
+        if (key === 'shop-camp' || key === 'dm-settings') {
+          expanded = true;
+        } else {
+          expanded = !!map[key];
+        }
         title.setAttribute('aria-expanded', expanded?'true':'false');
         content.forEach(n=> n.style.display = expanded? '' : 'none');
         title.addEventListener('click', (ev)=>{
@@ -2679,7 +2923,7 @@
       for (const d of demo) state.products.push({ id: uid(), ...d });
 
       renderShopPills(); renderCampaignPills(); renderChosenSummary(); updateGating(); initAccordion();
-      reloadPresets(); updatePresetControls(); renderTable(); renderDM(); applyScale();
+      reloadPresets(); updatePresetControls(); updateTemplateSettings(); renderTable(); renderDM(); applyScale();
       
       // 確保DOM載入完成後再更新使用次數顯示
       setTimeout(() => {
