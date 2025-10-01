@@ -1477,8 +1477,19 @@
         return false; 
       } 
       try{ 
-        localStorage.setItem(k, JSON.stringify(list)); 
-        console.log('saveProducts - 成功儲存到 key:', k, '商品數量:', list.length);
+        // 與既有存檔合併，避免並發寫入覆蓋
+        const rawExisting = localStorage.getItem(k); 
+        const existing = Array.isArray(JSON.parse(rawExisting||'[]')) ? JSON.parse(rawExisting||'[]') : []; 
+        const incomingMap = new Map(list.map(p=>[p.id,p]));
+        const mergedMap = new Map();
+        // 先放入既有（保留舊有未在本次列表的資料）
+        existing.forEach(p=> mergedMap.set(p.id, p));
+        // 再以本次更動覆蓋
+        incomingMap.forEach((v,id)=> mergedMap.set(id, v));
+        const merged = Array.from(mergedMap.values());
+        localStorage.setItem(k, JSON.stringify(merged)); 
+        state.products = merged; // 回寫記憶體，保持一致
+        console.log('saveProducts - 成功儲存到 key:', k, '商品數量:', merged.length);
         return true; 
       } 
       catch(e){ console.error('儲存商品失敗', e); return false; } 
