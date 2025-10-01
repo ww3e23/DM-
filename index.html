@@ -3435,6 +3435,9 @@
     function initApp() {
       console.log('初始化開始，時間:', new Date().toISOString());
       
+      // 每次初始化時重置標記
+      authCallbackExecuted = false;
+      
       // 清理所有可能的 demo 商品資料
       clearAllDemoProducts();
       
@@ -3470,15 +3473,6 @@
             }
 
             // 使用者狀態就緒後，載入用戶商品資料並確保預設樣式與預覽顯示
-            // 防止重複執行，只在第一次執行時載入商品資料
-            if (!authCallbackExecuted) {
-              authCallbackExecuted = true;
-              console.log('首次執行認證回調，載入用戶資料');
-            } else {
-              console.log('認證回調重複觸發，跳過商品載入');
-              return;
-            }
-            
             try { 
               console.log('Firebase 認證完成，載入用戶資料，user:', state.user?.id);
               
@@ -3498,21 +3492,24 @@
                 console.log('用戶資料已同步到後台系統');
               }
               
-              // 載入用戶商品資料
-              const savedProducts = loadProducts();
-              console.log('從 localStorage 載入的商品:', savedProducts.map(p => ({ id: p.id, name: p.name })));
-              // 只有在沒有現有商品時才載入儲存的商品，避免覆蓋用戶正在編輯的商品
-              if (state.products.length === 0) {
+              // 只在第一次執行時載入商品資料，避免覆蓋用戶正在編輯的商品
+              if (!authCallbackExecuted) {
+                authCallbackExecuted = true;
+                console.log('首次執行認證回調，載入商品資料');
+                // 載入用戶商品資料
+                const savedProducts = loadProducts();
+                console.log('從 localStorage 載入的商品:', savedProducts.map(p => ({ id: p.id, name: p.name })));
                 state.products = savedProducts; // 直接載入儲存的商品，如果沒有就是空陣列
                 console.log('載入的商品數量:', state.products.length);
                 console.log('載入後的商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
+                renderTable();
+                renderDM();
+                reloadPresets();
               } else {
-                console.log('保持現有商品，不重新載入，現有商品數量:', state.products.length);
+                console.log('認證回調重複觸發，保持現有商品，不重新載入');
+                console.log('現有商品數量:', state.products.length);
                 console.log('現有商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
               }
-              renderTable();
-              renderDM();
-              reloadPresets();
               
               // 定義並綁定新增商品函數（確保 state.user 已設置）
               const createInlineNewRow = ()=>{
