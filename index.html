@@ -1431,13 +1431,28 @@
     
     // 商品資料持久化
     function loadProducts(){
-      const k = productsKey(); if (!k) return [];
-      try { const raw = localStorage.getItem(k); const arr = JSON.parse(raw||'[]'); return Array.isArray(arr)?arr:[]; } catch{ return []; }
+      const k = productsKey(); 
+      console.log('loadProducts - key:', k, 'user:', state.user?.id);
+      if (!k) return [];
+      try { 
+        const raw = localStorage.getItem(k); 
+        const arr = JSON.parse(raw||'[]'); 
+        console.log('loadProducts - loaded:', arr.length, 'products');
+        return Array.isArray(arr)?arr:[]; 
+      } catch(e){ 
+        console.error('loadProducts error:', e);
+        return []; 
+      }
     }
     function saveProducts(list){ 
       const k = productsKey(); 
+      console.log('saveProducts - key:', k, 'user:', state.user?.id, 'products:', list.length);
       if (!k){ console.warn('未登入，無法儲存商品'); return false; } 
-      try{ localStorage.setItem(k, JSON.stringify(list)); return true; } 
+      try{ 
+        localStorage.setItem(k, JSON.stringify(list)); 
+        console.log('saveProducts - saved successfully');
+        return true; 
+      } 
       catch(e){ console.error('儲存商品失敗', e); return false; } 
     }
 
@@ -3353,18 +3368,21 @@
 
             // 使用者狀態就緒後，載入用戶商品資料並確保預設樣式與預覽顯示
             try { 
+              console.log('Firebase 認證完成，載入用戶資料，user:', state.user?.id);
               // 載入用戶商品資料
               const savedProducts = loadProducts();
               state.products = savedProducts; // 直接載入儲存的商品，如果沒有就是空陣列
+              console.log('載入的商品數量:', state.products.length);
               renderTable();
+              renderDM();
               reloadPresets(); 
             } catch(e){ console.warn('reloadPresets error', e); }
-            try { renderDM(); } catch(e){ console.warn('renderDM error', e); }
           });
         } else {
           // 後備：若 Firebase 尚未可用，保證未登入狀態
           state.user = null; setUser(null);
           state.products = []; // 未登入時保持商品列表為空
+          renderTable(); // 渲染空白的商品表格
           try { reloadPresets(); } catch(e){}
           try { renderDM(); } catch(e){}
         }
@@ -3447,8 +3465,7 @@
         reloadPresets(); 
         updatePresetControls(); 
         updateTemplateSettings(); 
-        renderTable(); 
-        renderDM(); 
+        // renderTable() 和 renderDM() 會在 Firebase 認證回調中調用
         applyScale();
         
         // 綁定商品庫按鈕事件
