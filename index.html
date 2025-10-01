@@ -1414,10 +1414,12 @@
     const SHOPS_KEY_PREFIX = 'dm-shops-v1:';
     const CAMPS_KEY_PREFIX = 'dm-campaigns-v1:'; // {userId}:{shopId}
     const PRESET_V5_PREFIX = 'dm-presets-v5:'; // {userId}:{shopId}:{campaignId}
+    const PRODUCTS_KEY_PREFIX = 'dm-products-v1:'; // {userId}
 
     function shopsKey(){ return state.user ? SHOPS_KEY_PREFIX + state.user.id : null; }
     function campsKey(shopId){ return state.user && shopId ? `${CAMPS_KEY_PREFIX}${state.user.id}:${shopId}` : null; }
     function presetsV5Key(shopId, campId){ return state.user && shopId && campId ? `${PRESET_V5_PREFIX}${state.user.id}:${shopId}:${campId}` : null; }
+    function productsKey(){ return state.user ? PRODUCTS_KEY_PREFIX + state.user.id : null; }
 
     function loadShops(){
       const k = shopsKey(); if (!k) return [];
@@ -1426,6 +1428,18 @@
     function saveShops(list){ const k=shopsKey(); if (!k){ alert('請先登入'); return false; } try{ localStorage.setItem(k, JSON.stringify(list)); return true; } catch(e){ alert('儲存店家失敗'); return false; } }
     function loadCamps(shopId){ const k=campsKey(shopId); if (!k) return []; try{ const raw=localStorage.getItem(k); const arr=JSON.parse(raw||'[]'); return Array.isArray(arr)?arr:[]; }catch{ return []; } }
     function saveCamps(shopId, list){ const k=campsKey(shopId); if (!k){ alert('請先登入'); return false; } try{ localStorage.setItem(k, JSON.stringify(list)); return true; } catch{ alert('儲存方案失敗'); return false; } }
+    
+    // 商品資料持久化
+    function loadProducts(){
+      const k = productsKey(); if (!k) return [];
+      try { const raw = localStorage.getItem(k); const arr = JSON.parse(raw||'[]'); return Array.isArray(arr)?arr:[]; } catch{ return []; }
+    }
+    function saveProducts(list){ 
+      const k = productsKey(); 
+      if (!k){ console.warn('未登入，無法儲存商品'); return false; } 
+      try{ localStorage.setItem(k, JSON.stringify(list)); return true; } 
+      catch(e){ console.error('儲存商品失敗', e); return false; } 
+    }
 
     function findShopById(id){ return loadShops().find(s=>s.id===id)||null; }
     function findCampById(shopId, id){ return loadCamps(shopId).find(c=>c.id===id)||null; }
@@ -2019,6 +2033,7 @@
             }
             state.products.push({ id: uid(), name: (row.name||'').toString(), price: Number(row.price||0), originalPrice: row.originalPrice? Number(row.originalPrice):'', desc: (row.desc||'').toString(), imageDataUrl });
           }
+          saveProducts(state.products); // 自動儲存
           renderTable(); renderDM();
         }
       });
@@ -2079,6 +2094,7 @@
             const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
             textarea.value = aiDescription;
             product.desc = aiDescription;
+            saveProducts(state.products); // 自動儲存
             
             // 恢復按鈕狀態
             e.target.textContent = 'AI';
@@ -2119,6 +2135,8 @@
             state.products = state.products.filter(p => p.id !== productId);
             // 從選擇中移除
             state.selection.delete(productId);
+            // 自動儲存
+            saveProducts(state.products);
             // 重新渲染表格和DM
             renderTable();
             renderDM();
@@ -2135,7 +2153,7 @@
           input.onchange = async (ev)=>{
             const file = ev.target.files[0]; if (!file) return;
             const url = await fileToDataUrl(file);
-            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; renderTable(); renderDM();
+            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; saveProducts(state.products); renderTable(); renderDM();
           };
           input.click();
         });
@@ -2148,6 +2166,7 @@
           const p = state.products.find(x=>x.id===id); if (!p) return;
           if (key==='price' || key==='originalPrice') p[key] = e.target.value===''? '' : Number(e.target.value);
           else p[key] = e.target.value;
+          saveProducts(state.products); // 自動儲存
           renderDM();
         });
       });
@@ -3332,8 +3351,29 @@
               state.user = null; setUser(null);
             }
 
-            // 使用者狀態就緒後，確保預設樣式與預覽顯示
-            try { reloadPresets(); } catch(e){ console.warn('reloadPresets error', e); }
+            // 使用者狀態就緒後，載入用戶商品資料並確保預設樣式與預覽顯示
+            try { 
+              // 載入用戶商品資料
+              const savedProducts = loadProducts();
+              if (savedProducts.length > 0) {
+                state.products = savedProducts;
+              } else {
+                // 如果沒有儲存的商品，載入 demo 商品
+                const demo = [
+                  { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
+                  { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
+                  { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
+                  { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
+                  { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
+                ];
+                state.products = [];
+                for (const d of demo) state.products.push({ id: uid(), ...d });
+                // 儲存 demo 商品到用戶資料
+                saveProducts(state.products);
+              }
+              renderTable();
+              reloadPresets(); 
+            } catch(e){ console.warn('reloadPresets error', e); }
             try { renderDM(); } catch(e){ console.warn('renderDM error', e); }
           });
         } else {
@@ -3346,15 +3386,19 @@
         console.error('用戶初始化失敗:', e);
       }
       
-      // Demo 商品
-      const demo = [
-        { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
-        { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
-        { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
-        { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
-        { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
-      ];
-      for (const d of demo) state.products.push({ id: uid(), ...d });
+      // 載入用戶商品資料（僅在未登入時載入 demo 商品）
+      if (!state.user) {
+        // 未登入：載入 demo 商品（不儲存）
+        const demo = [
+          { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
+          { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
+          { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
+          { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
+          { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
+        ];
+        for (const d of demo) state.products.push({ id: uid(), ...d });
+      }
+      // 已登入用戶的商品資料會在 Firebase 認證回調中載入
 
       // 定義新增商品函數
       const createInlineNewRow = ()=>{
@@ -3409,6 +3453,7 @@
           const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
           if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
           state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
+          saveProducts(state.products); // 自動儲存
           tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品');
         });
       };
@@ -3442,6 +3487,7 @@
             if (!confirm(`確定刪除已勾選的 ${state.selection.size} 項商品？`)) return;
             state.products = state.products.filter(p=> !state.selection.has(p.id));
             state.selection.clear();
+            saveProducts(state.products); // 自動儲存
             renderTable(); renderDM(); (window.toast||alert)('已刪除勾選商品');
           });
         }
@@ -3452,6 +3498,7 @@
             if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
             if (!confirm('確定刪除全部商品？此操作無法還原！')) return;
             state.products = []; state.selection.clear();
+            saveProducts(state.products); // 自動儲存
             renderTable(); renderDM(); (window.toast||alert)('已刪除全部商品');
           });
         }
@@ -3469,6 +3516,7 @@
               const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
               product.desc = aiDescription; updated++;
             });
+            saveProducts(state.products); // 自動儲存
             renderTable(); (window.toast||alert)(`已為 ${updated} 項商品生成描述`);
           });
         }
