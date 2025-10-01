@@ -1419,7 +1419,11 @@
     function shopsKey(){ return state.user ? SHOPS_KEY_PREFIX + state.user.id : null; }
     function campsKey(shopId){ return state.user && shopId ? `${CAMPS_KEY_PREFIX}${state.user.id}:${shopId}` : null; }
     function presetsV5Key(shopId, campId){ return state.user && shopId && campId ? `${PRESET_V5_PREFIX}${state.user.id}:${shopId}:${campId}` : null; }
-    function productsKey(){ return state.user ? PRODUCTS_KEY_PREFIX + state.user.id : null; }
+    function productsKey(){ 
+      const key = state.user ? PRODUCTS_KEY_PREFIX + state.user.id : null;
+      console.log('productsKey() 返回:', key, 'state.user:', state.user?.id);
+      return key;
+    }
 
     function loadShops(){
       const k = shopsKey(); if (!k) return [];
@@ -1432,12 +1436,16 @@
     // 商品資料持久化
     function loadProducts(){
       const k = productsKey(); 
-      console.log('loadProducts - key:', k, 'user:', state.user?.id);
-      if (!k) return [];
+      console.log('loadProducts 被調用 - key:', k, 'user:', state.user?.id);
+      if (!k) {
+        console.log('loadProducts - 無用戶，返回空陣列');
+        return [];
+      }
       try { 
         const raw = localStorage.getItem(k); 
+        console.log('loadProducts - 從 localStorage 讀取:', raw ? '有資料' : '無資料');
         const arr = JSON.parse(raw||'[]'); 
-        console.log('loadProducts - loaded:', arr.length, 'products');
+        console.log('loadProducts - 解析後商品數量:', arr.length);
         
         // 檢查是否有 demo 商品，如果有就清除
         const hasDemoProducts = arr.some(p => 
@@ -1454,6 +1462,7 @@
           return [];
         }
         
+        console.log('loadProducts - 返回商品數量:', arr.length);
         return Array.isArray(arr)?arr:[]; 
       } catch(e){ 
         console.error('loadProducts error:', e);
@@ -1462,14 +1471,14 @@
     }
     function saveProducts(list){ 
       const k = productsKey(); 
-      console.log('saveProducts - key:', k, 'user:', state.user?.id, 'products:', list.length);
+      console.log('saveProducts 被調用 - key:', k, 'user:', state.user?.id, 'products:', list.length);
       if (!k){ 
         console.warn('未登入，無法儲存商品，state.user:', state.user);
         return false; 
       } 
       try{ 
         localStorage.setItem(k, JSON.stringify(list)); 
-        console.log('saveProducts - saved successfully to key:', k);
+        console.log('saveProducts - 成功儲存到 key:', k, '商品數量:', list.length);
         return true; 
       } 
       catch(e){ console.error('儲存商品失敗', e); return false; } 
@@ -2085,7 +2094,22 @@
 
     // ===== 商品表格 =====
     function renderTable(){
+      console.log('renderTable 被調用，商品數量:', state.products.length);
       els.tbody.innerHTML = '';
+      
+      // 如果沒有商品，顯示提示信息
+      if (state.products.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td colspan="7" class="p-8 text-center text-gray-500">
+            <div class="text-lg mb-2">📦</div>
+            <div>目前沒有商品</div>
+            <div class="text-sm mt-1">點擊「新增商品」按鈕開始添加商品</div>
+          </td>`;
+        els.tbody.appendChild(tr);
+        return;
+      }
+      
       for (const p of state.products) {
         const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-slate-50';
         tr.innerHTML = `
@@ -3406,16 +3430,24 @@
 
     // ===== 初始化 =====
     function initApp() {
-      console.log('初始化開始');
+      console.log('初始化開始，時間:', new Date().toISOString());
       
       // 清理所有可能的 demo 商品資料
       clearAllDemoProducts();
       
       try {
         // 以 Firebase onAuthStateChanged 接管登入狀態
+        console.log('檢查 Firebase 認證系統:', {
+          firebaseAuth: !!window.firebaseAuth,
+          onAuth: !!(window.firebaseAuth && typeof window.firebaseAuth.onAuth === 'function')
+        });
+        
         if (window.firebaseAuth && typeof window.firebaseAuth.onAuth === 'function'){
+          console.log('Firebase 認證系統可用，註冊認證回調');
           window.firebaseAuth.onAuth((user)=>{
-        if (user){
+            console.log('Firebase 認證回調觸發，user:', user?.email);
+            console.log('認證回調執行時間:', new Date().toISOString());
+            if (user){
               const u = {
                 id: user.uid,
                 email: user.email||'',
@@ -3425,8 +3457,10 @@
                 usageCount: 0,
             isAdmin: (user.email && getAdminEmails().has((user.email||'').toLowerCase()))
               };
+              console.log('設置用戶狀態:', u);
               state.user = u; setUser(u);
             } else {
+              console.log('用戶未登入，清除狀態');
               state.user = null; setUser(null);
             }
 
@@ -3572,6 +3606,7 @@
           });
         } else {
           // 後備：若 Firebase 尚未可用，保證未登入狀態
+          console.log('Firebase 認證系統不可用，使用後備邏輯');
           state.user = null; setUser(null);
           state.products = []; // 未登入時保持商品列表為空
           renderTable(); // 渲染空白的商品表格
@@ -3681,9 +3716,13 @@
     
     // 等待DOM載入完成後初始化
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initApp);
+      document.addEventListener('DOMContentLoaded', () => {
+        // 等待 Firebase 初始化完成後再初始化應用
+        window.addEventListener('load', initApp);
+      });
     } else {
-      initApp();
+      // 如果 DOM 已經載入，直接等待 load 事件
+      window.addEventListener('load', initApp);
     }
   })();
   </script>
