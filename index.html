@@ -102,68 +102,6 @@
         console.log('QRCode庫載入成功');
       }
 
-      // 工具列：新增商品（在表格最上方插入一列可編輯的新商品）
-      const btnAddInline = document.getElementById('btn-add-product-inline');
-      const createInlineNewRow = ()=>{
-        const exist = els.tbody.querySelector('tr[data-new="1"]');
-        if (exist){ exist.querySelector('input[placeholder="商品名稱"]').focus(); return; }
-        const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50'; tr.dataset.new='1';
-        const newId = uid();
-        tr.innerHTML = `
-          <td class="p-2 align-top"></td>
-          <td class="p-2 align-top">
-            <div class="inline-block rounded-lg overflow-hidden cursor-pointer" id="newimg-${newId}" style="width:4rem;height:4rem;min-width:4rem;background:#f1f5f9;display:grid;place-items:center;">上傳</div>
-          </td>
-          <td class="p-2 align-top"><input class="w-48 border rounded-lg p-1" placeholder="商品名稱" id="newname-${newId}"></td>
-          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="售價" id="newprice-${newId}"></td>
-          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="原價(選填)" id="newori-${newId}"></td>
-          <td class="p-2 align-top">
-            <div class="flex gap-1">
-              <textarea class="flex-1 border rounded-lg p-1" rows="2" placeholder="描述(選填)" id="newdesc-${newId}"></textarea>
-              <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white" id="newai-${newId}">AI</button>
-            </div>
-          </td>
-          <td class="p-2 align-top">
-            <button type="button" class="px-3 py-1 text-xs rounded bg-emerald-600 text-white" id="newsave-${newId}">加入</button>
-            <button type="button" class="px-3 py-1 text-xs rounded bg-slate-400 text-white" id="newcancel-${newId}">取消</button>
-          </td>`;
-        els.tbody.prepend(tr);
-        tr.querySelector('input[placeholder="商品名稱"]').focus();
-        document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
-          const input = document.createElement('input'); input.type='file'; input.accept='image/*';
-          input.onchange = async (ev)=>{
-            const file = ev.target.files[0]; if (!file) return;
-            const url = await fileToDataUrl(file);
-            const box = document.getElementById(`newimg-${newId}`);
-            box.innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`; box.dataset.url = url;
-          };
-          input.click();
-        });
-        document.getElementById(`newai-${newId}`).addEventListener('click', ()=>{
-          const name = (document.getElementById(`newname-${newId}`).value||'').trim();
-          const price = Number(document.getElementById(`newprice-${newId}`).value||0);
-          const ori = Number(document.getElementById(`newori-${newId}`).value||0) || '';
-          const img = document.getElementById(`newimg-${newId}`).dataset.url||null;
-          const ai = generateAIDescription(name, price, ori, img);
-          document.getElementById(`newdesc-${newId}`).value = ai; (window.toast||alert)('已生成描述');
-        });
-        document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
-        document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
-          const name = (document.getElementById(`newname-${newId}`).value||'').trim();
-          const price = Number(document.getElementById(`newprice-${newId}`).value||0);
-          const ori = document.getElementById(`newori-${newId}`).value;
-          const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
-          const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
-          if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
-          state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
-          tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品');
-        });
-      };
-      // 綁定按鈕與委派（避免重繪遺失事件）
-      btnAddInline && btnAddInline.addEventListener('click', createInlineNewRow);
-      document.getElementById('product-table')?.addEventListener('click', (e)=>{
-        if ((e.target as HTMLElement).id === 'btn-add-product-inline') createInlineNewRow();
-      });
     });
   </script>
   <style>
@@ -2224,41 +2162,6 @@
         });
       }
 
-      // 工具列：刪除已勾選
-      const btnDelSelected = document.getElementById('btn-delete-selected');
-      btnDelSelected && btnDelSelected.addEventListener('click', ()=>{
-        if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
-        if (state.selection.size===0){ (window.toast||alert)('請先勾選要刪除的商品'); return; }
-        if (!confirm(`確定刪除已勾選的 ${state.selection.size} 項商品？`)) return;
-        state.products = state.products.filter(p=> !state.selection.has(p.id));
-        state.selection.clear();
-        renderTable(); renderDM(); (window.toast||alert)('已刪除勾選商品');
-      });
-
-      // 工具列：刪除全部
-      const btnDelAll = document.getElementById('btn-delete-all');
-      btnDelAll && btnDelAll.addEventListener('click', ()=>{
-        if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
-        if (!confirm('確定刪除全部商品？此操作無法還原！')) return;
-        state.products = []; state.selection.clear();
-        renderTable(); renderDM(); (window.toast||alert)('已刪除全部商品');
-      });
-
-      // 工具列：為勾選生成AI描述
-      const btnAiSelected = document.getElementById('btn-ai-desc-selected');
-      btnAiSelected && btnAiSelected.addEventListener('click', ()=>{
-        if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
-        const ids = [...state.selection];
-        if (ids.length===0){ (window.toast||alert)('請先勾選商品'); return; }
-        let updated = 0;
-        ids.forEach(id=>{
-          const product = state.products.find(p=>p.id===id);
-          if (!product) return;
-          const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
-          product.desc = aiDescription; updated++;
-        });
-        renderTable(); (window.toast||alert)(`已為 ${updated} 項商品生成描述`);
-      });
     }
 
     // ===== 模板渲染 =====
@@ -3430,14 +3333,12 @@
             }
 
             // 使用者狀態就緒後，確保預設樣式與預覽顯示
-            try { initAccordion(); } catch(e){ console.warn('initAccordion error', e); }
             try { reloadPresets(); } catch(e){ console.warn('reloadPresets error', e); }
             try { renderDM(); } catch(e){ console.warn('renderDM error', e); }
           });
         } else {
           // 後備：若 Firebase 尚未可用，保證未登入狀態
           state.user = null; setUser(null);
-          try { initAccordion(); } catch(e){}
           try { reloadPresets(); } catch(e){}
           try { renderDM(); } catch(e){}
         }
@@ -3455,6 +3356,63 @@
       ];
       for (const d of demo) state.products.push({ id: uid(), ...d });
 
+      // 定義新增商品函數
+      const createInlineNewRow = ()=>{
+        const exist = els.tbody.querySelector('tr[data-new="1"]');
+        if (exist){ exist.querySelector('input[placeholder="商品名稱"]').focus(); return; }
+        const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50'; tr.dataset.new='1';
+        const newId = uid();
+        tr.innerHTML = `
+          <td class="p-2 align-top"></td>
+          <td class="p-2 align-top">
+            <div class="inline-block rounded-lg overflow-hidden cursor-pointer" id="newimg-${newId}" style="width:4rem;height:4rem;min-width:4rem;background:#f1f5f9;display:grid;place-items:center;">上傳</div>
+          </td>
+          <td class="p-2 align-top"><input class="w-48 border rounded-lg p-1" placeholder="商品名稱" id="newname-${newId}"></td>
+          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="售價" id="newprice-${newId}"></td>
+          <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="原價(選填)" id="newori-${newId}"></td>
+          <td class="p-2 align-top">
+            <div class="flex gap-1">
+              <textarea class="flex-1 border rounded-lg p-1" rows="2" placeholder="描述(選填)" id="newdesc-${newId}"></textarea>
+              <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white" id="newai-${newId}">AI</button>
+            </div>
+          </td>
+          <td class="p-2 align-top">
+            <button type="button" class="px-3 py-1 text-xs rounded bg-emerald-600 text-white" id="newsave-${newId}">加入</button>
+            <button type="button" class="px-3 py-1 text-xs rounded bg-slate-400 text-white" id="newcancel-${newId}">取消</button>
+          </td>`;
+        els.tbody.prepend(tr);
+        tr.querySelector('input[placeholder="商品名稱"]').focus();
+        document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
+          const input = document.createElement('input'); input.type='file'; input.accept='image/*';
+          input.onchange = async (ev)=>{
+            const file = ev.target.files[0]; if (!file) return;
+            const url = await fileToDataUrl(file);
+            const box = document.getElementById(`newimg-${newId}`);
+            box.innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`; box.dataset.url = url;
+          };
+          input.click();
+        });
+        document.getElementById(`newai-${newId}`).addEventListener('click', ()=>{
+          const name = (document.getElementById(`newname-${newId}`).value||'').trim();
+          const price = Number(document.getElementById(`newprice-${newId}`).value||0);
+          const ori = Number(document.getElementById(`newori-${newId}`).value||0) || '';
+          const img = document.getElementById(`newimg-${newId}`).dataset.url||null;
+          const ai = generateAIDescription(name, price, ori, img);
+          document.getElementById(`newdesc-${newId}`).value = ai; (window.toast||alert)('已生成描述');
+        });
+        document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
+        document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
+          const name = (document.getElementById(`newname-${newId}`).value||'').trim();
+          const price = Number(document.getElementById(`newprice-${newId}`).value||0);
+          const ori = document.getElementById(`newori-${newId}`).value;
+          const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
+          const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
+          if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
+          state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
+          tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品');
+        });
+      };
+
       try {
         console.log('開始渲染頁面元素');
         renderShopPills(); 
@@ -3468,6 +3426,53 @@
         renderTable(); 
         renderDM(); 
         applyScale();
+        
+        // 綁定商品庫按鈕事件
+        const btnAddInline = document.getElementById('btn-add-product-inline');
+        if (btnAddInline) {
+          btnAddInline.addEventListener('click', createInlineNewRow);
+        }
+        
+        // 綁定批量操作按鈕事件
+        const btnDelSelected = document.getElementById('btn-delete-selected');
+        if (btnDelSelected) {
+          btnDelSelected.addEventListener('click', ()=>{
+            if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
+            if (state.selection.size===0){ (window.toast||alert)('請先勾選要刪除的商品'); return; }
+            if (!confirm(`確定刪除已勾選的 ${state.selection.size} 項商品？`)) return;
+            state.products = state.products.filter(p=> !state.selection.has(p.id));
+            state.selection.clear();
+            renderTable(); renderDM(); (window.toast||alert)('已刪除勾選商品');
+          });
+        }
+        
+        const btnDelAll = document.getElementById('btn-delete-all');
+        if (btnDelAll) {
+          btnDelAll.addEventListener('click', ()=>{
+            if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
+            if (!confirm('確定刪除全部商品？此操作無法還原！')) return;
+            state.products = []; state.selection.clear();
+            renderTable(); renderDM(); (window.toast||alert)('已刪除全部商品');
+          });
+        }
+        
+        const btnAiSelected = document.getElementById('btn-ai-desc-selected');
+        if (btnAiSelected) {
+          btnAiSelected.addEventListener('click', ()=>{
+            if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
+            const ids = [...state.selection];
+            if (ids.length===0){ (window.toast||alert)('請先勾選商品'); return; }
+            let updated = 0;
+            ids.forEach(id=>{
+              const product = state.products.find(p=>p.id===id);
+              if (!product) return;
+              const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
+              product.desc = aiDescription; updated++;
+            });
+            renderTable(); (window.toast||alert)(`已為 ${updated} 項商品生成描述`);
+          });
+        }
+        
         console.log('頁面渲染完成');
       } catch (e) {
         console.error('頁面渲染失敗:', e);
