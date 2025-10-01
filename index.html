@@ -1438,6 +1438,22 @@
         const raw = localStorage.getItem(k); 
         const arr = JSON.parse(raw||'[]'); 
         console.log('loadProducts - loaded:', arr.length, 'products');
+        
+        // 檢查是否有 demo 商品，如果有就清除
+        const hasDemoProducts = arr.some(p => 
+          p.name === '手作黑糖粉圓鮮奶 1L' || 
+          p.name === '低溫氣炸雞米花 500g' || 
+          p.name === '小農無毒牛番茄 2 斤' || 
+          p.name === '五花厚切燒肉片 600g' || 
+          p.name === '厚片蜂蜜吐司 6 片'
+        );
+        
+        if (hasDemoProducts) {
+          console.log('檢測到 demo 商品，清除中...');
+          localStorage.removeItem(k);
+          return [];
+        }
+        
         return Array.isArray(arr)?arr:[]; 
       } catch(e){ 
         console.error('loadProducts error:', e);
@@ -3347,9 +3363,54 @@
       state.products = backupP; state.selection = new Set(); state.template='grid9'; renderDM();
     }
 
+    // 清理所有 demo 商品資料
+    function clearAllDemoProducts() {
+      console.log('清理所有 demo 商品資料...');
+      
+      // 清理所有可能的商品儲存鍵
+      const keys = Object.keys(localStorage);
+      const productKeys = keys.filter(key => key.startsWith('dm-products-v1:'));
+      
+      productKeys.forEach(key => {
+        try {
+          const raw = localStorage.getItem(key);
+          const products = JSON.parse(raw || '[]');
+          
+          // 檢查是否有 demo 商品
+          const hasDemoProducts = products.some(p => 
+            p.name === '手作黑糖粉圓鮮奶 1L' || 
+            p.name === '低溫氣炸雞米花 500g' || 
+            p.name === '小農無毒牛番茄 2 斤' || 
+            p.name === '五花厚切燒肉片 600g' || 
+            p.name === '厚片蜂蜜吐司 6 片'
+          );
+          
+          if (hasDemoProducts) {
+            console.log('清除 demo 商品資料:', key);
+            localStorage.removeItem(key);
+          }
+        } catch (e) {
+          console.warn('清理商品資料時出錯:', key, e);
+        }
+      });
+      
+      // 清理舊的商品資料
+      const oldKeys = ['dm_products', 'products', 'demo_products'];
+      oldKeys.forEach(key => {
+        if (localStorage.getItem(key)) {
+          console.log('清除舊商品資料:', key);
+          localStorage.removeItem(key);
+        }
+      });
+    }
+
     // ===== 初始化 =====
     function initApp() {
       console.log('初始化開始');
+      
+      // 清理所有可能的 demo 商品資料
+      clearAllDemoProducts();
+      
       try {
         // 以 Firebase onAuthStateChanged 接管登入狀態
         if (window.firebaseAuth && typeof window.firebaseAuth.onAuth === 'function'){
@@ -3372,6 +3433,23 @@
             // 使用者狀態就緒後，載入用戶商品資料並確保預設樣式與預覽顯示
             try { 
               console.log('Firebase 認證完成，載入用戶資料，user:', state.user?.id);
+              
+              // 將 Firebase 用戶資料同步到舊系統，讓後台能看到
+              if (state.user) {
+                const users = getAllUsers();
+                users[state.user.email] = {
+                  id: state.user.id,
+                  email: state.user.email,
+                  name: state.user.name,
+                  isPremium: state.user.isPremium || false,
+                  usageCount: state.user.usageCount || 0,
+                  maxUsage: state.user.maxUsage || 10,
+                  createdAt: new Date().toISOString()
+                };
+                saveUsers(users);
+                console.log('用戶資料已同步到後台系統');
+              }
+              
               // 載入用戶商品資料
               const savedProducts = loadProducts();
               state.products = savedProducts; // 直接載入儲存的商品，如果沒有就是空陣列
@@ -3570,12 +3648,7 @@
         console.error('用戶初始化失敗:', e);
       }
       
-      // 載入用戶商品資料
-      if (!state.user) {
-        // 未登入：不載入任何商品，保持空白
-        state.products = [];
-      }
-      // 已登入用戶的商品資料會在 Firebase 認證回調中載入
+      // 商品資料載入邏輯已移到 Firebase 認證回調中
 
 
       try {
