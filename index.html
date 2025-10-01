@@ -3355,22 +3355,7 @@
             try { 
               // 載入用戶商品資料
               const savedProducts = loadProducts();
-              if (savedProducts.length > 0) {
-                state.products = savedProducts;
-              } else {
-                // 如果沒有儲存的商品，載入 demo 商品
-                const demo = [
-                  { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
-                  { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
-                  { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
-                  { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
-                  { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
-                ];
-                state.products = [];
-                for (const d of demo) state.products.push({ id: uid(), ...d });
-                // 儲存 demo 商品到用戶資料
-                saveProducts(state.products);
-              }
+              state.products = savedProducts; // 直接載入儲存的商品，如果沒有就是空陣列
               renderTable();
               reloadPresets(); 
             } catch(e){ console.warn('reloadPresets error', e); }
@@ -3379,6 +3364,7 @@
         } else {
           // 後備：若 Firebase 尚未可用，保證未登入狀態
           state.user = null; setUser(null);
+          state.products = []; // 未登入時保持商品列表為空
           try { reloadPresets(); } catch(e){}
           try { renderDM(); } catch(e){}
         }
@@ -3386,17 +3372,10 @@
         console.error('用戶初始化失敗:', e);
       }
       
-      // 載入用戶商品資料（僅在未登入時載入 demo 商品）
+      // 載入用戶商品資料
       if (!state.user) {
-        // 未登入：載入 demo 商品（不儲存）
-        const demo = [
-          { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
-          { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
-          { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
-          { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
-          { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
-        ];
-        for (const d of demo) state.products.push({ id: uid(), ...d });
+        // 未登入：不載入任何商品，保持空白
+        state.products = [];
       }
       // 已登入用戶的商品資料會在 Firebase 認證回調中載入
 
