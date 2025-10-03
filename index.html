@@ -1463,6 +1463,7 @@
         }
         
         console.log('loadProducts - 返回商品數量:', arr.length);
+        console.log('loadProducts - 載入的商品:', arr.map(p => ({ id: p.id, name: p.name, updatedAt: p.updatedAt })));
         return Array.isArray(arr)?arr:[]; 
       } catch(e){ 
         console.error('loadProducts error:', e);
@@ -1477,19 +1478,20 @@
         return false; 
       } 
       try{ 
-        // 與既有存檔合併，避免並發寫入覆蓋
-        const rawExisting = localStorage.getItem(k); 
-        const existing = Array.isArray(JSON.parse(rawExisting||'[]')) ? JSON.parse(rawExisting||'[]') : []; 
-        const incomingMap = new Map(list.map(p=>[p.id,p]));
-        const mergedMap = new Map();
-        // 先放入既有（保留舊有未在本次列表的資料）
-        existing.forEach(p=> mergedMap.set(p.id, p));
-        // 再以本次更動覆蓋
-        incomingMap.forEach((v,id)=> mergedMap.set(id, v));
-        const merged = Array.from(mergedMap.values());
-        localStorage.setItem(k, JSON.stringify(merged)); 
-        state.products = merged; // 回寫記憶體，保持一致
-        console.log('saveProducts - 成功儲存到 key:', k, '商品數量:', merged.length);
+        // 直接覆蓋儲存，確保最新狀態被保存
+        const productsToSave = Array.isArray(list) ? list : [];
+        
+        // 為所有商品補上 updatedAt 時間戳
+        productsToSave.forEach(p => {
+          if (p && p.id && !p.updatedAt) {
+            p.updatedAt = new Date().toISOString();
+          }
+        });
+        
+        localStorage.setItem(k, JSON.stringify(productsToSave)); 
+        state.products = productsToSave; // 回寫記憶體，保持一致
+        console.log('saveProducts - 成功儲存到 key:', k, '商品數量:', productsToSave.length);
+        console.log('saveProducts - 儲存的商品:', productsToSave.map(p => ({ id: p.id, name: p.name, updatedAt: p.updatedAt })));
         return true; 
       } 
       catch(e){ console.error('儲存商品失敗', e); return false; } 
@@ -2066,6 +2068,7 @@
         imageDataUrl: pendingImage || '',
       };
       if (!product.name || !product.price) { alert('請填商品名與售價'); return; }
+      product.updatedAt = new Date().toISOString();
       state.products.unshift(product);
       pendingImage = null; els.imgName.textContent = '尚未選擇'; els.form.reset();
       renderTable(); renderDM();
@@ -2106,6 +2109,7 @@
     // ===== 商品表格 =====
     function renderTable(){
       console.log('renderTable 被調用，商品數量:', state.products.length);
+      console.log('renderTable - 當前商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
       els.tbody.innerHTML = '';
       
       // 如果沒有商品，顯示提示信息
@@ -2222,7 +2226,7 @@
           input.onchange = async (ev)=>{
             const file = ev.target.files[0]; if (!file) return;
             const url = await fileToDataUrl(file);
-            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; saveProducts(state.products); renderTable(); renderDM();
+            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; p.updatedAt = new Date().toISOString(); saveProducts(state.products); renderTable(); renderDM();
           };
           input.click();
         });
@@ -2235,6 +2239,7 @@
           const p = state.products.find(x=>x.id===id); if (!p) return;
           if (key==='price' || key==='originalPrice') p[key] = e.target.value===''? '' : Number(e.target.value);
           else p[key] = e.target.value;
+          p.updatedAt = new Date().toISOString();
           saveProducts(state.products); // 自動儲存
           renderDM();
         });
@@ -3513,6 +3518,18 @@
                 state.products = savedProducts; // 直接載入儲存的商品，如果沒有就是空陣列
                 console.log('載入的商品數量:', state.products.length);
                 console.log('載入後的商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
+                
+                // 驗證載入結果
+                if (savedProducts.length > 0) {
+                  console.log('✅ 商品載入成功，開始渲染');
+                } else {
+                  console.log('ℹ️ 無商品資料，顯示空白商品庫');
+                }
+                
+                // 確保渲染前 state.products 正確
+                console.log('渲染前最終檢查 - state.products 數量:', state.products.length);
+                console.log('渲染前最終檢查 - state.products 內容:', state.products.map(p => ({ id: p.id, name: p.name })));
+                
                 renderTable();
                 renderDM();
                 reloadPresets();
@@ -3520,6 +3537,10 @@
                 console.log('認證回調重複觸發，保持現有商品，不重新載入');
                 console.log('現有商品數量:', state.products.length);
                 console.log('現有商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
+                
+                // 即使重複觸發，也要確保渲染正確
+                renderTable();
+                renderDM();
               }
               
               // 定義並綁定新增商品函數（確保 state.user 已設置）
@@ -3576,7 +3597,7 @@
                   const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
                   const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
                   if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
-                  const newProduct = { id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl };
+                  const newProduct = { id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl, updatedAt: new Date().toISOString() };
                   state.products.unshift(newProduct);
                   console.log('新增商品:', newProduct);
                   console.log('準備儲存商品，用戶:', state.user?.id, '商品數量:', state.products.length);
@@ -3701,7 +3722,7 @@
               const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
               const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
               if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
-              state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl });
+              state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl, updatedAt: new Date().toISOString() });
               console.log('後備模式：商品已新增到記憶體，但不會儲存');
               tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品（未登入，不會儲存）');
             });
@@ -3758,6 +3779,35 @@
       // 如果 DOM 已經載入，直接等待 load 事件
       window.addEventListener('load', initApp);
     }
+
+    // 頁面關閉前自動保存
+    window.addEventListener('beforeunload', () => {
+      if (state.user && state.products && state.products.length > 0) {
+        console.log('頁面關閉前自動保存商品，數量:', state.products.length);
+        console.log('頁面關閉前自動保存商品，內容:', state.products.map(p => ({ id: p.id, name: p.name })));
+        saveProducts(state.products);
+      }
+    });
+
+    // 頁面載入完成後的驗證
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (state.user && state.products) {
+          console.log('頁面載入完成後驗證 - 用戶:', state.user.id);
+          console.log('頁面載入完成後驗證 - 商品數量:', state.products.length);
+          console.log('頁面載入完成後驗證 - 商品內容:', state.products.map(p => ({ id: p.id, name: p.name })));
+          
+          // 檢查 localStorage 中的資料
+          const key = productsKey();
+          if (key) {
+            const raw = localStorage.getItem(key);
+            const stored = raw ? JSON.parse(raw) : [];
+            console.log('頁面載入完成後驗證 - localStorage 商品數量:', stored.length);
+            console.log('頁面載入完成後驗證 - localStorage 商品內容:', stored.map(p => ({ id: p.id, name: p.name })));
+          }
+        }
+      }, 2000);
+    });
   })();
   </script>
 </body>
