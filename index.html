@@ -3467,6 +3467,7 @@
       
       // 每次初始化時重置標記
       authCallbackExecuted = false;
+      console.log('authCallbackExecuted 已重置為 false');
       
       // 清理所有可能的 demo 商品資料
       clearAllDemoProducts();
@@ -3526,6 +3527,7 @@
               if (!authCallbackExecuted) {
                 authCallbackExecuted = true;
                 console.log('首次執行認證回調，載入商品資料');
+                console.log('authCallbackExecuted 設為 true');
                 // 載入用戶商品資料
                 const savedProducts = loadProducts();
                 console.log('從 localStorage 載入的商品:', savedProducts.map(p => ({ id: p.id, name: p.name })));
@@ -3563,6 +3565,15 @@
                 console.log('認證回調重複觸發，保持現有商品，不重新載入');
                 console.log('現有商品數量:', state.products.length);
                 console.log('現有商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
+                
+                // 如果現有商品為空，強制重新載入
+                if (state.products.length === 0) {
+                  console.log('⚠️ 現有商品為空，強制重新載入商品資料');
+                  const savedProducts = loadProducts();
+                  console.log('強制載入的商品:', savedProducts.map(p => ({ id: p.id, name: p.name })));
+                  state.products = savedProducts;
+                  console.log('強制載入後商品數量:', state.products.length);
+                }
                 
                 // 即使重複觸發，也要確保渲染正確
                 renderTable();
@@ -3844,6 +3855,14 @@
             const stored = raw ? JSON.parse(raw) : [];
             console.log('頁面載入完成後驗證 - localStorage 商品數量:', stored.length);
             console.log('頁面載入完成後驗證 - localStorage 商品內容:', stored.map(p => ({ id: p.id, name: p.name })));
+            
+            // 如果 localStorage 有資料但 state.products 為空，強制同步
+            if (stored.length > 0 && state.products.length === 0) {
+              console.log('⚠️ 發現 localStorage 有資料但 state.products 為空，強制同步');
+              state.products = stored;
+              renderTable();
+              renderDM();
+            }
           }
         }
       }, 2000);
