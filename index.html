@@ -1447,13 +1447,16 @@
         const arr = JSON.parse(raw||'[]'); 
         console.log('loadProducts - 解析後商品數量:', arr.length);
         
-        // 檢查是否有 demo 商品，如果有就清除
+        // 檢查是否有 demo 商品或測試商品，如果有就清除
         const hasDemoProducts = arr.some(p => 
           p.name === '手作黑糖粉圓鮮奶 1L' || 
           p.name === '低溫氣炸雞米花 500g' || 
           p.name === '小農無毒牛番茄 2 斤' || 
           p.name === '五花厚切燒肉片 600g' || 
-          p.name === '厚片蜂蜜吐司 6 片'
+          p.name === '厚片蜂蜜吐司 6 片' ||
+          p.name === '測試品' ||
+          p.name === '453' ||
+          (p.name && p.name.length <= 3 && /^\d+$/.test(p.name)) // 清除純數字的商品名稱
         );
         
         if (hasDemoProducts) {
@@ -3386,11 +3389,17 @@
       log(state.template==='grid9', '預設模板為九宮格');
       // 商品庫表頭全選存在
       log(!!document.getElementById('select-all'), '商品庫有全選勾選');
-      // 分頁檢查
+      // 分頁檢查（使用臨時測試資料，不影響實際商品）
       const backupP = [...state.products];
-      while(state.products.length<11){ state.products.push({ id: uid(), name:'測試品', price:1, originalPrice:'', desc:'', imageDataUrl:'' }); }
-      state.selection = new Set(state.products.map(p=>p.id));
-      state.template='grid9'; renderDM();
+      const testProducts = [];
+      while(testProducts.length<11){ testProducts.push({ id: uid(), name:'測試品', price:1, originalPrice:'', desc:'', imageDataUrl:'' }); }
+      const originalSelection = new Set(state.selection);
+      state.selection = new Set(testProducts.map(p=>p.id));
+      state.template='grid9'; 
+      // 臨時替換商品進行測試
+      const originalProducts = state.products;
+      state.products = testProducts;
+      renderDM();
       log(els.dmCanvas.children.length>=2, '九宮格 >9 件會分頁');
       state.template='list'; renderDM(); log(els.dmCanvas.children.length>=1, '清單可渲染多頁');
       state.template='single'; renderDM(); log(els.dmCanvas.children.length>=1, '單品可分頁');
@@ -3399,8 +3408,10 @@
       // 徽章不重複
       state.template='single'; renderDM();
       const badgeCount = (els.dmCanvas.innerHTML.match(/限時特價/g)||[]).length; log(badgeCount<=1, '促銷徽章不重複');
-      // 還原
-      state.products = backupP; state.selection = new Set(); state.template='grid9'; renderDM();
+      // 還原原始狀態
+      state.products = originalProducts;
+      state.selection = originalSelection;
+      state.template='grid9'; renderDM();
     }
 
     // 清理所有 demo 商品資料
@@ -3416,17 +3427,20 @@
           const raw = localStorage.getItem(key);
           const products = JSON.parse(raw || '[]');
           
-          // 檢查是否有 demo 商品
+          // 檢查是否有 demo 商品或測試商品
           const hasDemoProducts = products.some(p => 
             p.name === '手作黑糖粉圓鮮奶 1L' || 
             p.name === '低溫氣炸雞米花 500g' || 
             p.name === '小農無毒牛番茄 2 斤' || 
             p.name === '五花厚切燒肉片 600g' || 
-            p.name === '厚片蜂蜜吐司 6 片'
+            p.name === '厚片蜂蜜吐司 6 片' ||
+            p.name === '測試品' ||
+            p.name === '453' ||
+            (p.name && p.name.length <= 3 && /^\d+$/.test(p.name)) // 清除純數字的商品名稱
           );
           
           if (hasDemoProducts) {
-            console.log('清除 demo 商品資料:', key);
+            console.log('清除包含 demo/測試商品的資料:', key);
             localStorage.removeItem(key);
           }
         } catch (e) {
