@@ -1421,7 +1421,7 @@
     function presetsV5Key(shopId, campId){ return state.user && shopId && campId ? `${PRESET_V5_PREFIX}${state.user.id}:${shopId}:${campId}` : null; }
     function productsKey(){ 
       const key = state.user ? PRODUCTS_KEY_PREFIX + state.user.id : null;
-      console.log('productsKey() 返回:', key, 'state.user:', state.user?.id);
+      console.log('productsKey() 返回:', key, 'state.user:', state.user?.id, 'state.user.email:', state.user?.email);
       return key;
     }
 
@@ -3538,6 +3538,18 @@
                   console.log('✅ 商品載入成功，開始渲染');
                 } else {
                   console.log('ℹ️ 無商品資料，顯示空白商品庫');
+                  // 檢查是否有其他用戶的商品資料
+                  const allKeys = Object.keys(localStorage);
+                  const productKeys = allKeys.filter(key => key.startsWith('dm-products-v1:'));
+                  console.log('所有商品儲存鍵:', productKeys);
+                  productKeys.forEach(key => {
+                    const raw = localStorage.getItem(key);
+                    const products = raw ? JSON.parse(raw) : [];
+                    console.log(`鍵 ${key} 的商品數量:`, products.length);
+                    if (products.length > 0) {
+                      console.log(`鍵 ${key} 的商品內容:`, products.map(p => ({ id: p.id, name: p.name })));
+                    }
+                  });
                 }
                 
                 // 確保渲染前 state.products 正確
@@ -3616,8 +3628,22 @@
                   console.log('新增商品:', newProduct);
                   console.log('準備儲存商品，用戶:', state.user?.id, '商品數量:', state.products.length);
                   console.log('當前商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
-                  const saveResult = saveProducts(state.products); // 自動儲存
+                  
+                  // 立即儲存並驗證
+                  const saveResult = saveProducts(state.products);
                   console.log('儲存結果:', saveResult);
+                  
+                  // 驗證儲存是否成功
+                  if (saveResult) {
+                    const key = productsKey();
+                    const stored = localStorage.getItem(key);
+                    const parsed = stored ? JSON.parse(stored) : [];
+                    console.log('儲存後驗證 - localStorage 商品數量:', parsed.length);
+                    console.log('儲存後驗證 - localStorage 商品內容:', parsed.map(p => ({ id: p.id, name: p.name })));
+                  } else {
+                    console.error('儲存失敗！');
+                  }
+                  
                   tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品');
                 });
               };
