@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}仪表板 - 整合平台{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8" x-data="dashboard()">
+    <!-- 欢迎区域 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+            欢迎回来，{{ current_user.username }}！
+        </h1>
+        <p class="text-gray-600">这是您的个人仪表板，可以查看使用统计和快速访问功能</p>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- DM使用统计 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100">
+                    <i class="fas fa-file-image text-blue-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">DM生成次数</p>
+                    <p class="text-2xl font-bold text-gray-900" x-text="stats.dm_usage_count || 0"></p>
+                    <p class="text-xs text-gray-500">本月限制: <span x-text="stats.dm_monthly_limit || 0"></span></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- QR使用统计 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100">
+                    <i class="fas fa-qrcode text-green-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">QR生成次数</p>
+                    <p class="text-2xl font-bold text-gray-900" x-text="stats.qr_usage_count || 0"></p>
+                    <p class="text-xs text-gray-500">本月限制: <span x-text="stats.qr_monthly_limit || 0"></span></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 当前方案 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100">
+                    <i class="fas fa-crown text-purple-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">当前方案</p>
+                    <p class="text-lg font-bold text-gray-900" x-text="getPlanName(stats.plan_type)"></p>
+                    <p class="text-xs text-gray-500" x-show="stats.plan_expires_at">
+                        到期: <span x-text="formatDate(stats.plan_expires_at)"></span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 账户状态 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100">
+                    <i class="fas fa-user-check text-orange-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">账户状态</p>
+                    <p class="text-lg font-bold text-green-600">活跃</p>
+                    <p class="text-xs text-gray-500">邮箱: <span x-text="stats.email"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 快速操作 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- DM生成器 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-900">DM自动生产器</h3>
+                <i class="fas fa-file-image text-blue-600 text-2xl"></i>
+            </div>
+            <p class="text-gray-600 mb-4">
+                智能生成精美的DM内容，支持多种模板和自定义样式
+            </p>
+            <div class="space-y-3">
+                <a href="/dm-generator" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">
+                    <i class="fas fa-play mr-2"></i>开始生成DM
+                </a>
+                <div class="text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    本月已使用 <span x-text="stats.dm_usage_count || 0"></span> / <span x-text="stats.dm_monthly_limit || 0"></span> 次
+                </div>
+            </div>
+        </div>
+        
+        <!-- QR生成器 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-900">QR永久生产器</h3>
+                <i class="fas fa-qrcode text-green-600 text-2xl"></i>
+            </div>
+            <p class="text-gray-600 mb-4">
+                生成各种类型的QR码，支持URL、文本、WiFi配置等多种格式
+            </p>
+            <div class="space-y-3">
+                <a href="/qr-generator" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center">
+                    <i class="fas fa-play mr-2"></i>开始生成QR码
+                </a>
+                <div class="text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    本月已使用 <span x-text="stats.qr_usage_count || 0"></span> / <span x-text="stats.qr_monthly_limit || 0"></span> 次
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 使用进度 -->
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mb-8">
+        <h3 class="text-xl font-bold text-gray-900 mb-6">使用进度</h3>
+        
+        <div class="space-y-6">
+            <!-- DM使用进度 -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-700">DM生成</span>
+                    <span class="text-sm text-gray-500" x-text="getUsagePercentage(stats.dm_usage_count, stats.dm_monthly_limit) + '%'"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                         :style="'width: ' + getUsagePercentage(stats.dm_usage_count, stats.dm_monthly_limit) + '%'"></div>
+                </div>
+            </div>
+            
+            <!-- QR使用进度 -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-700">QR生成</span>
+                    <span class="text-sm text-gray-500" x-text="getUsagePercentage(stats.qr_usage_count, stats.qr_monthly_limit) + '%'"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                         :style="'width: ' + getUsagePercentage(stats.qr_usage_count, stats.qr_monthly_limit) + '%'"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 最近活动 -->
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        <h3 class="text-xl font-bold text-gray-900 mb-6">最近活动</h3>
+        <div class="space-y-4">
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="p-2 rounded-full bg-blue-100">
+                    <i class="fas fa-file-image text-blue-600"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-900">DM生成器</p>
+                    <p class="text-sm text-gray-500">您已成功生成 <span x-text="stats.dm_usage_count || 0"></span> 个DM</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="p-2 rounded-full bg-green-100">
+                    <i class="fas fa-qrcode text-green-600"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-900">QR生成器</p>
+                    <p class="text-sm text-gray-500">您已成功生成 <span x-text="stats.qr_usage_count || 0"></span> 个QR码</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="p-2 rounded-full bg-purple-100">
+                    <i class="fas fa-user-plus text-purple-600"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-900">账户创建</p>
+                    <p class="text-sm text-gray-500">欢迎加入整合平台！</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function dashboard() {
+    return {
+        stats: {},
+        loading: true,
+        
+        async init() {
+            await this.loadStats();
+        },
+        
+        async loadStats() {
+            try {
+                const response = await fetch('/api/user/stats');
+                const data = await response.json();
+                this.stats = data;
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+                showToast('加载统计数据失败', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        getPlanName(planType) {
+            const plans = {
+                'free': '免费方案',
+                'basic': '基础方案',
+                'premium': '高级方案',
+                'enterprise': '企业方案'
+            };
+            return plans[planType] || '未知方案';
+        },
+        
+        formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('zh-CN');
+        },
+        
+        getUsagePercentage(used, total) {
+            if (!total || total === 0) return 0;
+            return Math.min(Math.round((used / total) * 100), 100);
+        }
+    }
+}
+</script>
+{% endblock %}

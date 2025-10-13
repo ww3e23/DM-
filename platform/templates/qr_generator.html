@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+
+{% block title %}QR生成器 - 整合平台{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8" x-data="qrGenerator()">
+    <!-- 页面标题 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">QR永久生产器</h1>
+        <p class="text-gray-600">生成各种类型的QR码，支持URL、文本、WiFi配置等多种格式</p>
+    </div>
+    
+    <!-- 使用限制提示 -->
+    <div x-show="usageLimitReached" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-triangle text-yellow-600 mr-3"></i>
+            <div>
+                <h3 class="text-sm font-medium text-yellow-800">使用限制提醒</h3>
+                <p class="text-sm text-yellow-700 mt-1">
+                    您本月的QR生成次数已达上限。请升级方案或等待下月重置。
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- 左侧：配置面板 -->
+        <div class="lg:col-span-1">
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 sticky top-8">
+                <h3 class="text-lg font-bold text-gray-900 mb-6">配置选项</h3>
+                
+                <!-- QR类型选择 -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">QR码类型</label>
+                    <select 
+                        x-model="selectedType"
+                        @change="onTypeChange"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="text">纯文本</option>
+                        <option value="url">网址链接</option>
+                        <option value="wifi">WiFi配置</option>
+                        <option value="email">邮件</option>
+                        <option value="phone">电话</option>
+                        <option value="sms">短信</option>
+                        <option value="contact">联系人</option>
+                    </select>
+                </div>
+                
+                <!-- 动态内容输入 -->
+                <div class="space-y-4">
+                    <!-- 文本类型 -->
+                    <div x-show="selectedType === 'text'">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">文本内容</label>
+                        <textarea 
+                            x-model="formData.text"
+                            rows="4"
+                            placeholder="输入要编码的文本内容"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                    </div>
+                    
+                    <!-- URL类型 -->
+                    <div x-show="selectedType === 'url'">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">网址</label>
+                        <input 
+                            type="url" 
+                            x-model="formData.url"
+                            placeholder="https://example.com"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- WiFi类型 -->
+                    <div x-show="selectedType === 'wifi'" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">WiFi名称</label>
+                            <input 
+                                type="text" 
+                                x-model="formData.wifi.ssid"
+                                placeholder="WiFi网络名称"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                            <input 
+                                type="password" 
+                                x-model="formData.wifi.password"
+                                placeholder="WiFi密码"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">加密类型</label>
+                            <select 
+                                x-model="formData.wifi.security"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="WPA">WPA/WPA2</option>
+                                <option value="WEP">WEP</option>
+                                <option value="nopass">无密码</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 邮件类型 -->
+                    <div x-show="selectedType === 'email'" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">收件人邮箱</label>
+                            <input 
+                                type="email" 
+                                x-model="formData.email.to"
+                                placeholder="recipient@example.com"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">邮件主题</label>
+                            <input 
+                                type="text" 
+                                x-model="formData.email.subject"
+                                placeholder="邮件主题"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">邮件内容</label>
+                            <textarea 
+                                x-model="formData.email.body"
+                                rows="3"
+                                placeholder="邮件内容"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- 电话类型 -->
+                    <div x-show="selectedType === 'phone'">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">电话号码</label>
+                        <input 
+                            type="tel" 
+                            x-model="formData.phone"
+                            placeholder="+86 138 0013 8000"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- 短信类型 -->
+                    <div x-show="selectedType === 'sms'" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">电话号码</label>
+                            <input 
+                                type="tel" 
+                                x-model="formData.sms.phone"
+                                placeholder="+86 138 0013 8000"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">短信内容</label>
+                            <textarea 
+                                x-model="formData.sms.message"
+                                rows="3"
+                                placeholder="短信内容"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- 联系人类型 -->
+                    <div x-show="selectedType === 'contact'" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+                            <input 
+                                type="text" 
+                                x-model="formData.contact.name"
+                                placeholder="联系人姓名"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">电话</label>
+                            <input 
+                                type="tel" 
+                                x-model="formData.contact.phone"
+                                placeholder="+86 138 0013 8000"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">邮箱</label>
+                            <input 
+                                type="email" 
+                                x-model="formData.contact.email"
+                                placeholder="contact@example.com"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">公司/组织</label>
+                            <input 
+                                type="text" 
+                                x-model="formData.contact.org"
+                                placeholder="公司或组织名称"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 样式选项 -->
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">QR码大小</label>
+                    <select 
+                        x-model="qrSize"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="256">256x256 (小)</option>
+                        <option value="512">512x512 (中)</option>
+                        <option value="1024">1024x1024 (大)</option>
+                    </select>
+                </div>
+                
+                <!-- 生成按钮 -->
+                <button 
+                    @click="generateQR"
+                    :disabled="loading || usageLimitReached || !hasValidData"
+                    class="w-full mt-6 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                    <i class="fas fa-qrcode mr-2" :class="{'animate-spin': loading}"></i>
+                    <span x-text="loading ? '生成中...' : '生成QR码'"></span>
+                </button>
+                
+                <!-- 使用统计 -->
+                <div class="mt-4 text-sm text-gray-500 text-center">
+                    本月已使用 <span x-text="stats.qr_usage_count || 0"></span> / <span x-text="stats.qr_monthly_limit || 0"></span> 次
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧：预览区域 -->
+        <div class="lg:col-span-2">
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-bold text-gray-900">QR码预览</h3>
+                    <div class="flex space-x-2" x-show="generatedQR">
+                        <button 
+                            @click="downloadQR"
+                            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            <i class="fas fa-download mr-1"></i>下载
+                        </button>
+                        <button 
+                            @click="shareQR"
+                            class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            <i class="fas fa-share mr-1"></i>分享
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- QR码预览 -->
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 min-h-96 flex items-center justify-center">
+                    <div x-show="!generatedQR" class="text-center text-gray-500">
+                        <i class="fas fa-qrcode text-4xl mb-4"></i>
+                        <p>配置完成后点击"生成QR码"查看预览</p>
+                    </div>
+                    
+                    <div x-show="generatedQR" class="text-center">
+                        <img :src="qrImageData" :alt="'QR码 - ' + selectedType" class="mx-auto mb-4">
+                        <p class="text-sm text-gray-600" x-text="getQRDescription()"></p>
+                    </div>
+                </div>
+                
+                <!-- 生成历史 -->
+                <div class="mt-8">
+                    <h4 class="text-md font-bold text-gray-900 mb-4">最近生成</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <i class="fas fa-qrcode text-green-600 mr-3"></i>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">网址QR码</p>
+                                <p class="text-xs text-gray-500">2024-01-15 14:30</p>
+                            </div>
+                            <button class="text-blue-600 hover:text-blue-800 text-sm">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <i class="fas fa-qrcode text-blue-600 mr-3"></i>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">WiFi配置QR码</p>
+                                <p class="text-xs text-gray-500">2024-01-14 10:15</p>
+                            </div>
+                            <button class="text-blue-600 hover:text-blue-800 text-sm">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function qrGenerator() {
+    return {
+        selectedType: 'text',
+        qrSize: '512',
+        generatedQR: false,
+        qrImageData: '',
+        loading: false,
+        stats: {},
+        usageLimitReached: false,
+        
+        formData: {
+            text: '',
+            url: '',
+            wifi: {
+                ssid: '',
+                password: '',
+                security: 'WPA'
+            },
+            email: {
+                to: '',
+                subject: '',
+                body: ''
+            },
+            phone: '',
+            sms: {
+                phone: '',
+                message: ''
+            },
+            contact: {
+                name: '',
+                phone: '',
+                email: '',
+                org: ''
+            }
+        },
+        
+        async init() {
+            await this.loadStats();
+        },
+        
+        async loadStats() {
+            try {
+                const response = await fetch('/api/user/stats');
+                const data = await response.json();
+                this.stats = data;
+                this.usageLimitReached = data.qr_usage_count >= data.qr_monthly_limit;
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+            }
+        },
+        
+        onTypeChange() {
+            // 清空其他类型的数据
+            Object.keys(this.formData).forEach(key => {
+                if (key !== this.selectedType && typeof this.formData[key] === 'object') {
+                    Object.keys(this.formData[key]).forEach(subKey => {
+                        this.formData[key][subKey] = '';
+                    });
+                } else if (key !== this.selectedType) {
+                    this.formData[key] = '';
+                }
+            });
+        },
+        
+        get hasValidData() {
+            switch (this.selectedType) {
+                case 'text':
+                    return this.formData.text.trim() !== '';
+                case 'url':
+                    return this.formData.url.trim() !== '';
+                case 'wifi':
+                    return this.formData.wifi.ssid.trim() !== '';
+                case 'email':
+                    return this.formData.email.to.trim() !== '';
+                case 'phone':
+                    return this.formData.phone.trim() !== '';
+                case 'sms':
+                    return this.formData.sms.phone.trim() !== '' && this.formData.sms.message.trim() !== '';
+                case 'contact':
+                    return this.formData.contact.name.trim() !== '';
+                default:
+                    return false;
+            }
+        },
+        
+        getQRDescription() {
+            const descriptions = {
+                'text': '文本QR码',
+                'url': '网址QR码',
+                'wifi': 'WiFi配置QR码',
+                'email': '邮件QR码',
+                'phone': '电话QR码',
+                'sms': '短信QR码',
+                'contact': '联系人QR码'
+            };
+            return descriptions[this.selectedType] || 'QR码';
+        },
+        
+        async generateQR() {
+            if (this.usageLimitReached) {
+                showToast('本月QR生成次数已达上限', 'warning');
+                return;
+            }
+            
+            if (!this.hasValidData) {
+                showToast('请填写必要的信息', 'warning');
+                return;
+            }
+            
+            this.loading = true;
+            
+            try {
+                const qrData = this.getQRData();
+                
+                const response = await fetch('/api/qr/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        data: qrData,
+                        type: this.selectedType,
+                        size: parseInt(this.qrSize)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.qrImageData = 'data:image/png;base64,' + data.data;
+                    this.generatedQR = true;
+                    showToast('QR码生成成功！', 'success');
+                    await this.loadStats(); // 重新加载统计数据
+                } else {
+                    showToast(data.error || '生成失败', 'error');
+                }
+            } catch (error) {
+                showToast('网络错误，请稍后重试', 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        getQRData() {
+            switch (this.selectedType) {
+                case 'text':
+                    return this.formData.text;
+                case 'url':
+                    return this.formData.url;
+                case 'wifi':
+                    return `WIFI:T:${this.formData.wifi.security};S:${this.formData.wifi.ssid};P:${this.formData.wifi.password};H:false;;`;
+                case 'email':
+                    return `mailto:${this.formData.email.to}?subject=${encodeURIComponent(this.formData.email.subject)}&body=${encodeURIComponent(this.formData.email.body)}`;
+                case 'phone':
+                    return `tel:${this.formData.phone}`;
+                case 'sms':
+                    return `sms:${this.formData.sms.phone}:${this.formData.sms.message}`;
+                case 'contact':
+                    return `BEGIN:VCARD\nVERSION:3.0\nFN:${this.formData.contact.name}\nORG:${this.formData.contact.org}\nTEL:${this.formData.contact.phone}\nEMAIL:${this.formData.contact.email}\nEND:VCARD`;
+                default:
+                    return '';
+            }
+        },
+        
+        downloadQR() {
+            if (!this.generatedQR) return;
+            
+            const link = document.createElement('a');
+            link.download = `qr_${this.selectedType}_${new Date().getTime()}.png`;
+            link.href = this.qrImageData;
+            link.click();
+            
+            showToast('QR码下载成功！', 'success');
+        },
+        
+        shareQR() {
+            if (!this.generatedQR) return;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'QR码',
+                    text: '查看这个QR码',
+                    url: this.qrImageData
+                });
+            } else {
+                // 复制到剪贴板
+                navigator.clipboard.writeText(this.qrImageData).then(() => {
+                    showToast('QR码链接已复制到剪贴板', 'success');
+                });
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

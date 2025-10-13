@@ -1,0 +1,45 @@
+[
+    {
+        "type": "text",
+        "data": "Hello World!",
+        "style": "standard"
+    },
+    {
+        "type": "url",
+        "data": "https://www.google.com",
+        "style": "rounded"
+    },
+    {
+        "type": "wifi",
+        "data": {
+            "ssid": "MyWiFi",
+            "password": "password123",
+            "security": "WPA"
+        },
+        "style": "gradient"
+    },
+    {
+        "type": "email",
+        "data": {
+            "email": "test@example.com",
+            "subject": "Hello",
+            "body": "This is a test email"
+        },
+        "style": "standard"
+    },
+    {
+        "type": "phone",
+        "data": "+1234567890",
+        "style": "rounded"
+    },
+    {
+        "type": "contact",
+        "data": {
+            "name": "John Doe",
+            "phone": "+1234567890",
+            "email": "john@example.com",
+            "org": "Example Corp"
+        },
+        "style": "gradient"
+    }
+]

@@ -1,0 +1,30 @@
+{
+    "output_directory": "qr_codes",
+    "default_size": 15,
+    "default_border": 4,
+    "default_error_correction": "M",
+    "default_style": "standard",
+    "auto_naming": true,
+    "naming_pattern": "{type}_{timestamp}_{index}",
+    "image_format": "PNG",
+    "styles": {
+        "standard": {
+            "module_drawer": "square",
+            "color_mask": "solid",
+            "fill_color": "black",
+            "back_color": "white"
+        },
+        "rounded": {
+            "module_drawer": "rounded",
+            "color_mask": "radial",
+            "fill_color": "blue",
+            "back_color": "white"
+        },
+        "gradient": {
+            "module_drawer": "circle",
+            "color_mask": "radial",
+            "fill_color": "purple",
+            "back_color": "white"
+        }
+    }
+}

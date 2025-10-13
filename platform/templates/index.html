@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 整合平台{% endblock %}
+
+{% block content %}
+<!-- 英雄区域 -->
+<section class="gradient-bg text-white py-20">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+        <h1 class="text-5xl font-bold mb-6">整合平台</h1>
+        <p class="text-xl mb-8 max-w-3xl mx-auto">
+            整合DM自动生产器和QR永久生产器，为您提供一站式的内容创作解决方案
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/register" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                <i class="fas fa-rocket mr-2"></i>立即开始
+            </a>
+            <a href="#features" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                <i class="fas fa-info-circle mr-2"></i>了解更多
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- 功能特色 -->
+<section id="features" class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">功能特色</h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                强大的工具组合，满足您的各种内容创作需求
+            </p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- DM生成器 -->
+            <div class="card-hover bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-file-image text-blue-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">DM自动生产器</h3>
+                    <p class="text-gray-600 mb-6">
+                        智能生成精美的DM内容，支持多种模板和自定义样式，让您的营销内容更加专业
+                    </p>
+                    <ul class="text-left text-gray-600 space-y-2">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>多种预设模板</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>自定义样式</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>批量生成</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>高质量导出</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- QR生成器 -->
+            <div class="card-hover bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-qrcode text-green-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">QR永久生产器</h3>
+                    <p class="text-gray-600 mb-6">
+                        生成各种类型的QR码，支持URL、文本、WiFi配置等多种格式，永久保存
+                    </p>
+                    <ul class="text-left text-gray-600 space-y-2">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>多种QR类型</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>批量生成</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>永久保存</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>高清导出</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 用户管理 -->
+            <div class="card-hover bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-users text-purple-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">用户管理系统</h3>
+                    <p class="text-gray-600 mb-6">
+                        完善的用户账户管理，记录使用次数、购买方案和福利信息
+                    </p>
+                    <ul class="text-left text-gray-600 space-y-2">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>账户管理</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>使用统计</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>方案管理</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>福利记录</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 方案介绍 -->
+<section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">选择您的方案</h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                灵活的定价方案，满足不同用户的需求
+            </p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- 免费方案 -->
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <div class="text-center">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">免费方案</h3>
+                    <div class="text-4xl font-bold text-blue-600 mb-4">¥0</div>
+                    <p class="text-gray-600 mb-6">适合个人用户试用</p>
+                    <ul class="text-left text-gray-600 space-y-3 mb-8">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>DM生成：10次/月</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>QR生成：50次/月</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>基础模板</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>社区支持</li>
+                    </ul>
+                    <a href="/register" class="w-full bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors block">
+                        免费开始
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 基础方案 -->
+            <div class="bg-white p-8 rounded-xl shadow-lg border-2 border-blue-500 relative">
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <span class="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">推荐</span>
+                </div>
+                <div class="text-center">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">基础方案</h3>
+                    <div class="text-4xl font-bold text-blue-600 mb-4">¥29<span class="text-lg text-gray-500">/月</span></div>
+                    <p class="text-gray-600 mb-6">适合小型团队</p>
+                    <ul class="text-left text-gray-600 space-y-3 mb-8">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>DM生成：100次/月</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>QR生成：500次/月</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>高级模板</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>优先支持</li>
+                    </ul>
+                    <a href="/register" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors block">
+                        选择方案
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 企业方案 -->
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <div class="text-center">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">企业方案</h3>
+                    <div class="text-4xl font-bold text-blue-600 mb-4">¥99<span class="text-lg text-gray-500">/月</span></div>
+                    <p class="text-gray-600 mb-6">适合大型企业</p>
+                    <ul class="text-left text-gray-600 space-y-3 mb-8">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>DM生成：无限制</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>QR生成：无限制</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>所有模板</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>专属支持</li>
+                    </ul>
+                    <a href="/register" class="w-full bg-purple-500 text-white py-3 rounded-lg font-semibold hover:bg-purple-600 transition-colors block">
+                        联系销售
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 统计数据 -->
+<section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+            <div>
+                <div class="text-4xl font-bold text-blue-600 mb-2">1000+</div>
+                <div class="text-gray-600">注册用户</div>
+            </div>
+            <div>
+                <div class="text-4xl font-bold text-green-600 mb-2">50000+</div>
+                <div class="text-gray-600">DM生成</div>
+            </div>
+            <div>
+                <div class="text-4xl font-bold text-purple-600 mb-2">100000+</div>
+                <div class="text-gray-600">QR码生成</div>
+            </div>
+            <div>
+                <div class="text-4xl font-bold text-orange-600 mb-2">99.9%</div>
+                <div class="text-gray-600">服务可用性</div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

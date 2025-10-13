@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}管理后台 - 整合平台{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8" x-data="adminPanel()">
+    <!-- 页面标题 -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">管理后台</h1>
+        <p class="text-gray-600">系统管理和用户管理</p>
+    </div>
+    
+    <!-- 统计概览 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100">
+                    <i class="fas fa-users text-blue-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">总用户数</p>
+                    <p class="text-2xl font-bold text-gray-900" x-text="stats.total_users || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100">
+                    <i class="fas fa-user-check text-green-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">活跃用户</p>
+                    <p class="text-2xl font-bold text-gray-900" x-text="stats.active_users || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100">
+                    <i class="fas fa-file-image text-purple-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">DM生成总数</p>
+                    <p class="text-2xl font-bold text-gray-900" x-text="stats.total_dm_generated || 0"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100">
+                    <i class="fas fa-qrcode text-orange-600 text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">QR生成总数</p>
+                    <p class="text-2xl font-bold text-gray-900" x-text="stats.total_qr_generated || 0"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 标签页导航 -->
+    <div class="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8 px-6">
+                <button 
+                    @click="activeTab = 'users'"
+                    :class="activeTab === 'users' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-users mr-2"></i>用户管理
+                </button>
+                <button 
+                    @click="activeTab = 'plans'"
+                    :class="activeTab === 'plans' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-crown mr-2"></i>方案管理
+                </button>
+                <button 
+                    @click="activeTab = 'system'"
+                    :class="activeTab === 'system' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    <i class="fas fa-cog mr-2"></i>系统设置
+                </button>
+            </nav>
+        </div>
+        
+        <div class="p-6">
+            <!-- 用户管理标签页 -->
+            <div x-show="activeTab === 'users'">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-bold text-gray-900">用户列表</h3>
+                    <div class="flex space-x-2">
+                        <button 
+                            @click="refreshUsers"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            <i class="fas fa-sync-alt mr-1"></i>刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">方案</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用统计</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="user in users" :key="user.id">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900" x-text="user.username"></div>
+                                            <div class="text-sm text-gray-500" x-text="user.email"></div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                              :class="getPlanBadgeClass(user.plan_type)"
+                                              x-text="getPlanName(user.plan_type)"></span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <div>DM: <span x-text="user.dm_usage_count"></span></div>
+                                        <div>QR: <span x-text="user.qr_usage_count"></span></div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                              :class="user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                              x-text="user.is_active ? '活跃' : '禁用'"></span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button 
+                                            @click="editUser(user)"
+                                            class="text-blue-600 hover:text-blue-900 mr-3">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button 
+                                            @click="toggleUserStatus(user)"
+                                            :class="user.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'">
+                                            <i :class="user.is_active ? 'fas fa-ban' : 'fas fa-check'"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 方案管理标签页 -->
+            <div x-show="activeTab === 'plans'">
+                <h3 class="text-lg font-bold text-gray-900 mb-6">方案管理</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-4">免费方案</h4>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div>DM生成：10次/月</div>
+                            <div>QR生成：50次/月</div>
+                            <div>基础模板</div>
+                            <div>社区支持</div>
+                        </div>
+                        <button class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                            编辑方案
+                        </button>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-4">基础方案</h4>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div>DM生成：100次/月</div>
+                            <div>QR生成：500次/月</div>
+                            <div>高级模板</div>
+                            <div>优先支持</div>
+                        </div>
+                        <button class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                            编辑方案
+                        </button>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-6 rounded-lg">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-4">企业方案</h4>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div>DM生成：无限制</div>
+                            <div>QR生成：无限制</div>
+                            <div>所有模板</div>
+                            <div>专属支持</div>
+                        </div>
+                        <button class="mt-4 w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors">
+                            编辑方案
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 系统设置标签页 -->
+            <div x-show="activeTab === 'system'">
+                <h3 class="text-lg font-bold text-gray-900 mb-6">系统设置</h3>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h4 class="text-md font-semibold text-gray-900 mb-4">系统信息</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="font-medium text-gray-700">系统版本：</span>
+                                <span class="text-gray-600">v1.0.0</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-700">数据库：</span>
+                                <span class="text-gray-600">SQLite</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-700">运行时间：</span>
+                                <span class="text-gray-600">24小时</span>
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-700">最后备份：</span>
+                                <span class="text-gray-600">2024-01-15 10:30</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h4 class="text-md font-semibold text-gray-900 mb-4">维护操作</h4>
+                        <div class="flex space-x-4">
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                <i class="fas fa-database mr-1"></i>备份数据库
+                            </button>
+                            <button class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                <i class="fas fa-sync-alt mr-1"></i>清理缓存
+                            </button>
+                            <button class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                <i class="fas fa-tools mr-1"></i>系统维护
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function adminPanel() {
+    return {
+        activeTab: 'users',
+        stats: {},
+        users: [],
+        loading: false,
+        
+        async init() {
+            await this.loadStats();
+            await this.loadUsers();
+        },
+        
+        async loadStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const data = await response.json();
+                this.stats = data;
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+            }
+        },
+        
+        async loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                const data = await response.json();
+                this.users = data;
+            } catch (error) {
+                console.error('加载用户列表失败:', error);
+            }
+        },
+        
+        async refreshUsers() {
+            await this.loadUsers();
+            showToast('用户列表已刷新', 'success');
+        },
+        
+        getPlanName(planType) {
+            const plans = {
+                'free': '免费方案',
+                'basic': '基础方案',
+                'premium': '高级方案',
+                'enterprise': '企业方案'
+            };
+            return plans[planType] || '未知方案';
+        },
+        
+        getPlanBadgeClass(planType) {
+            const classes = {
+                'free': 'bg-gray-100 text-gray-800',
+                'basic': 'bg-blue-100 text-blue-800',
+                'premium': 'bg-purple-100 text-purple-800',
+                'enterprise': 'bg-yellow-100 text-yellow-800'
+            };
+            return classes[planType] || 'bg-gray-100 text-gray-800';
+        },
+        
+        editUser(user) {
+            showToast('编辑用户功能开发中...', 'info');
+        },
+        
+        async toggleUserStatus(user) {
+            try {
+                // 这里应该调用API来切换用户状态
+                showToast('切换用户状态功能开发中...', 'info');
+            } catch (error) {
+                showToast('操作失败', 'error');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

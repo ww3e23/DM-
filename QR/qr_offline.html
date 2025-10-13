@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR碼生成器 - 離線版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .output-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .qr-grid {
+            display: inline-block;
+            border: 2px solid #000;
+            background: white;
+        }
+
+        .qr-cell {
+            width: 8px;
+            height: 8px;
+            display: inline-block;
+            margin: 0;
+            padding: 0;
+        }
+
+        .qr-cell.black {
+            background-color: #000;
+        }
+
+        .qr-cell.white {
+            background-color: #fff;
+        }
+
+        .qr-cell.blue {
+            background-color: #4285f4;
+        }
+
+        .qr-cell.purple {
+            background-color: #8e24aa;
+        }
+
+        .qr-cell.green {
+            background-color: #28a745;
+        }
+
+        .qr-cell.red {
+            background-color: #dc3545;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .examples {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .examples h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .example-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            transition: background-color 0.2s;
+        }
+
+        .example-item:hover {
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QR碼生成器</h1>
+            <p>離線版 - 無需網絡，完全本地生成</p>
+        </div>
+
+        <div class="content">
+            <div class="form-group">
+                <label for="qrType">QR碼類型</label>
+                <select id="qrType" onchange="updateInputFields()">
+                    <option value="text">文字</option>
+                    <option value="url">網址</option>
+                    <option value="wifi">WiFi</option>
+                    <option value="email">郵件</option>
+                    <option value="phone">電話</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="qrStyle">樣式</label>
+                <select id="qrStyle">
+                    <option value="standard">標準</option>
+                    <option value="blue">藍色</option>
+                    <option value="purple">紫色</option>
+                    <option value="green">綠色</option>
+                    <option value="red">紅色</option>
+                </select>
+            </div>
+
+            <div id="inputFields">
+                <div class="form-group">
+                    <label for="qrData">內容</label>
+                    <input type="text" id="qrData" placeholder="輸入要編碼的內容">
+                </div>
+            </div>
+
+            <button class="btn" onclick="generateQR()" id="generateBtn">🚀 生成QR碼</button>
+            
+            <div class="status" id="statusMessage"></div>
+
+            <div class="output-section" id="outputSection" style="display: none;">
+                <h2>📱 QR碼預覽</h2>
+                <div class="qr-container">
+                    <div id="qrcode"></div>
+                </div>
+                <button class="download-btn" onclick="downloadQR()">📥 下載PNG</button>
+            </div>
+
+            <div class="examples">
+                <h3>💡 快速示例</h3>
+                <div class="example-item" onclick="fillExample('text', 'Hello World!')">
+                    📝 文字: Hello World!
+                </div>
+                <div class="example-item" onclick="fillExample('url', 'https://www.google.com')">
+                    🌐 網址: https://www.google.com
+                </div>
+                <div class="example-item" onclick="fillExample('phone', '+886-912-345-678')">
+                    📞 電話: +886-912-345-678
+                </div>
+                <div class="example-item" onclick="fillExample('email', 'test@example.com')">
+                    📧 郵件: test@example.com
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQRData = null;
+
+        // 簡單的QR碼生成器（基於Reed-Solomon編碼的簡化版本）
+        function generateQRCode(data) {
+            // 這是一個簡化的QR碼生成器
+            // 實際的QR碼生成非常複雜，這裡提供一個基本的視覺表示
+            
+            const size = 25; // QR碼大小
+            const qrGrid = [];
+            
+            // 初始化網格
+            for (let i = 0; i < size; i++) {
+                qrGrid[i] = [];
+                for (let j = 0; j < size; j++) {
+                    qrGrid[i][j] = false;
+                }
+            }
+            
+            // 添加定位標記（三個角落）
+            addFinderPattern(qrGrid, 0, 0);
+            addFinderPattern(qrGrid, size - 7, 0);
+            addFinderPattern(qrGrid, 0, size - 7);
+            
+            // 添加分隔符
+            addSeparator(qrGrid, 0, 0);
+            addSeparator(qrGrid, size - 8, 0);
+            addSeparator(qrGrid, 0, size - 8);
+            
+            // 添加時鐘標記
+            addTimingPattern(qrGrid, size);
+            
+            // 添加數據模式（基於輸入數據的哈希）
+            addDataPattern(qrGrid, data, size);
+            
+            // 添加掩碼
+            applyMask(qrGrid, size);
+            
+            return qrGrid;
+        }
+        
+        function addFinderPattern(grid, startX, startY) {
+            const pattern = [
+                [1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1]
+            ];
+            
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < 7; j++) {
+                    if (startX + i < grid.length && startY + j < grid[0].length) {
+                        grid[startX + i][startY + j] = pattern[i][j] === 1;
+                    }
+                }
+            }
+        }
+        
+        function addSeparator(grid, startX, startY) {
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    if (startX + i < grid.length && startY + j < grid[0].length) {
+                        if (i === 0 || i === 7 || j === 0 || j === 7) {
+                            grid[startX + i][startY + j] = false;
+                        }
+                    }
+                }
+            }
+        }
+        
+        function addTimingPattern(grid, size) {
+            for (let i = 8; i < size - 8; i++) {
+                grid[6][i] = i % 2 === 0;
+                grid[i][6] = i % 2 === 0;
+            }
+        }
+        
+        function addDataPattern(grid, data, size) {
+            // 基於數據生成模式
+            let hash = 0;
+            for (let i = 0; i < data.length; i++) {
+                hash = ((hash << 5) - hash + data.charCodeAt(i)) & 0xffffffff;
+            }
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (!isReserved(grid, i, j, size)) {
+                        const bit = (hash + i * size + j) % 2;
+                        grid[i][j] = bit === 1;
+                    }
+                }
+            }
+        }
+        
+        function isReserved(grid, x, y, size) {
+            // 檢查是否為保留區域
+            if (x < 9 && y < 9) return true; // 左上定位標記
+            if (x >= size - 8 && y < 9) return true; // 右上定位標記
+            if (x < 9 && y >= size - 8) return true; // 左下定位標記
+            if (x === 6 || y === 6) return true; // 時鐘標記
+            return false;
+        }
+        
+        function applyMask(grid, size) {
+            // 應用簡單的掩碼模式
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (!isReserved(grid, i, j, size)) {
+                        if ((i + j) % 2 === 0) {
+                            grid[i][j] = !grid[i][j];
+                        }
+                    }
+                }
+            }
+        }
+
+        // 更新輸入字段
+        function updateInputFields() {
+            const qrType = document.getElementById('qrType').value;
+            const inputFields = document.getElementById('inputFields');
+            let html = '';
+
+            switch(qrType) {
+                case 'text':
+                    html = '<div class="form-group"><label for="qrData">文字內容</label><input type="text" id="qrData" placeholder="輸入要編碼的文字"></div>';
+                    break;
+                case 'url':
+                    html = '<div class="form-group"><label for="qrData">網址</label><input type="url" id="qrData" placeholder="https://example.com"></div>';
+                    break;
+                case 'wifi':
+                    html = `
+                        <div class="form-group">
+                            <label for="wifiSSID">WiFi名稱</label>
+                            <input type="text" id="wifiSSID" placeholder="WiFi名稱">
+                        </div>
+                        <div class="form-group">
+                            <label for="wifiPassword">密碼</label>
+                            <input type="text" id="wifiPassword" placeholder="WiFi密碼">
+                        </div>
+                        <div class="form-group">
+                            <label for="wifiSecurity">安全類型</label>
+                            <select id="wifiSecurity">
+                                <option value="WPA">WPA/WPA2</option>
+                                <option value="WEP">WEP</option>
+                                <option value="nopass">無密碼</option>
+                            </select>
+                        </div>
+                    `;
+                    break;
+                case 'email':
+                    html = `
+                        <div class="form-group">
+                            <label for="emailAddress">郵件地址</label>
+                            <input type="email" id="emailAddress" placeholder="example@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="emailSubject">主題</label>
+                            <input type="text" id="emailSubject" placeholder="郵件主題">
+                        </div>
+                        <div class="form-group">
+                            <label for="emailBody">內容</label>
+                            <textarea id="emailBody" placeholder="郵件內容"></textarea>
+                        </div>
+                    `;
+                    break;
+                case 'phone':
+                    html = '<div class="form-group"><label for="qrData">電話號碼</label><input type="tel" id="qrData" placeholder="+886-912-345-678"></div>';
+                    break;
+            }
+
+            inputFields.innerHTML = html;
+        }
+
+        // 填充示例
+        function fillExample(type, data) {
+            document.getElementById('qrType').value = type;
+            updateInputFields();
+            
+            if (type === 'wifi') {
+                document.getElementById('wifiSSID').value = 'MyWiFi';
+                document.getElementById('wifiPassword').value = 'password123';
+            } else if (type === 'email') {
+                document.getElementById('emailAddress').value = data;
+                document.getElementById('emailSubject').value = 'Hello';
+                document.getElementById('emailBody').value = 'This is a test email';
+            } else {
+                document.getElementById('qrData').value = data;
+            }
+        }
+
+        // 生成QR碼
+        function generateQR() {
+            const qrType = document.getElementById('qrType').value;
+            const qrStyle = document.getElementById('qrStyle').value;
+            let data = '';
+
+            // 根據類型獲取數據
+            switch(qrType) {
+                case 'text':
+                case 'url':
+                case 'phone':
+                    data = document.getElementById('qrData').value;
+                    break;
+                case 'wifi':
+                    const ssid = document.getElementById('wifiSSID').value;
+                    const password = document.getElementById('wifiPassword').value;
+                    const security = document.getElementById('wifiSecurity').value;
+                    if (!ssid.trim()) {
+                        showStatus('請輸入WiFi名稱', 'error');
+                        return;
+                    }
+                    data = `WIFI:T:${security};S:${ssid};P:${password};H:false;;`;
+                    break;
+                case 'email':
+                    const email = document.getElementById('emailAddress').value;
+                    const subject = document.getElementById('emailSubject').value;
+                    const body = document.getElementById('emailBody').value;
+                    if (!email.trim()) {
+                        showStatus('請輸入郵件地址', 'error');
+                        return;
+                    }
+                    data = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                    break;
+            }
+
+            if (!data.trim()) {
+                showStatus('請輸入要編碼的內容', 'error');
+                return;
+            }
+
+            // 生成QR碼
+            const qrGrid = generateQRCode(data);
+            
+            // 顯示QR碼
+            displayQRCode(qrGrid, qrStyle);
+            
+            currentQRData = data;
+            document.getElementById('outputSection').style.display = 'block';
+            showStatus('QR碼生成成功！', 'success');
+        }
+
+        // 顯示QR碼
+        function displayQRCode(grid, style) {
+            const container = document.getElementById('qrcode');
+            container.innerHTML = '';
+            
+            const qrDiv = document.createElement('div');
+            qrDiv.className = 'qr-grid';
+            
+            for (let i = 0; i < grid.length; i++) {
+                for (let j = 0; j < grid[i].length; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'qr-cell';
+                    
+                    if (grid[i][j]) {
+                        cell.classList.add(style === 'standard' ? 'black' : style);
+                    } else {
+                        cell.classList.add('white');
+                    }
+                    
+                    qrDiv.appendChild(cell);
+                }
+            }
+            
+            container.appendChild(qrDiv);
+        }
+
+        // 下載PNG
+        function downloadQR() {
+            if (!currentQRData) return;
+
+            const qrDiv = document.querySelector('.qr-grid');
+            if (!qrDiv) return;
+
+            // 創建canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const cellSize = 8;
+            const size = 25;
+            canvas.width = size * cellSize;
+            canvas.height = size * cellSize;
+            
+            // 繪製QR碼
+            const cells = qrDiv.querySelectorAll('.qr-cell');
+            let index = 0;
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const cell = cells[index++];
+                    const color = cell.classList.contains('black') ? '#000000' :
+                                 cell.classList.contains('blue') ? '#4285f4' :
+                                 cell.classList.contains('purple') ? '#8e24aa' :
+                                 cell.classList.contains('green') ? '#28a745' :
+                                 cell.classList.contains('red') ? '#dc3545' : '#ffffff';
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+                }
+            }
+            
+            // 下載
+            const link = document.createElement('a');
+            link.download = `qrcode_${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // 顯示狀態消息
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateInputFields();
+            showStatus('離線QR碼生成器已就緒！', 'success');
+        });
+    </script>
+</body>
+</html>

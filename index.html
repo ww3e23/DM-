@@ -10,52 +10,6 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
-  <!-- 私密設定：請在專案根目錄建立 config.js（已忽略不會上傳），內容格式見 config.sample.js -->
-  <script src="config.js"></script>
-  <script type="module">
-    // Firebase 初始化（正式登入）
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import {
-      getAuth,
-      setPersistence,
-      browserLocalPersistence,
-      browserSessionPersistence,
-      onAuthStateChanged,
-      signInWithEmailAndPassword,
-      createUserWithEmailAndPassword,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signOut as fbSignOut
-    } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-
-    const firebaseConfig = (window.APP_CONFIG && window.APP_CONFIG.firebaseConfig) || null;
-    if (!firebaseConfig) {
-      alert('缺少 config.js 或 firebaseConfig，請複製 config.sample.js 為 config.js 並填入你的 Firebase 設定');
-      throw new Error('Missing firebaseConfig');
-    }
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-
-    // 對外暴露最小 API，供頁面主程式呼叫
-    window.firebaseAuth = {
-      onAuth: (cb) => onAuthStateChanged(auth, cb),
-      signIn: async (email, password, remember) => {
-        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
-        return await signInWithEmailAndPassword(auth, email, password);
-      },
-      signUp: async (email, password, remember) => {
-        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
-        return await createUserWithEmailAndPassword(auth, email, password);
-      },
-      googleSignIn: async (remember) => {
-        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
-        const provider = new GoogleAuthProvider();
-        return await signInWithPopup(auth, provider);
-      },
-      signOut: async () => fbSignOut(auth)
-    };
-  </script>
   <script>
     // 備用QRCode庫載入
     window.addEventListener('load', function() {
@@ -101,7 +55,6 @@
       } else {
         console.log('QRCode庫載入成功');
       }
-
     });
   </script>
   <style>
@@ -155,71 +108,22 @@
   </style>
 </head>
 <body class="bg-slate-50">
-  <!-- 頂部藍條 -->
-  <div class="bg-blue-100 border-b border-blue-200 py-2 px-4">
-    <div class="max-w-4xl mx-auto flex justify-between items-center">
-      <div class="text-sm text-blue-800 font-medium">DM 生產器</div>
-      <div class="flex items-center gap-3">
-        <span id="usage-display" class="text-xs text-blue-600"></span>
-        <span id="login-state" class="text-xs text-blue-600">未登入</span>
-        <button id="show-login-modal" class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">登入</button>
-        <button id="show-register-modal" class="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">註冊</button>
-        <button id="logout-btn" class="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 hidden">登出</button>
-        <button id="admin-panel" class="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 hidden" onclick="window.open('admin.html', '_blank')">管理員</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 登入彈窗 -->
-  <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded-lg p-6 w-80 max-w-sm mx-4">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-semibold">登入</h3>
-        <button id="close-login-modal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-      </div>
-      <div class="space-y-3">
-        <input type="email" id="login-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg">
-        <input type="password" id="login-password" placeholder="密碼" class="w-full px-3 py-2 border rounded-lg">
-        <div class="flex items-center">
-          <input type="checkbox" id="remember-login" class="mr-2">
-          <label for="remember-login" class="text-sm text-gray-600">維持自動登入</label>
-        </div>
-        <button id="login-btn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">登入</button>
-        <div class="text-center text-sm text-gray-500">或</div>
-        <button id="google-login-btn" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2">
-          <span>🔍</span>
-          Google 登入
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 註冊彈窗 -->
-  <div id="register-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded-lg p-6 w-80 max-w-sm mx-4">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-semibold">註冊</h3>
-        <button id="close-register-modal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-      </div>
-      <div class="space-y-3">
-        <input type="text" id="register-name" placeholder="姓名" class="w-full px-3 py-2 border rounded-lg">
-        <input type="email" id="register-email" placeholder="電子郵件" class="w-full px-3 py-2 border rounded-lg">
-        <input type="password" id="register-password" placeholder="密碼" class="w-full px-3 py-2 border rounded-lg">
-        <input type="password" id="register-confirm-password" placeholder="確認密碼" class="w-full px-3 py-2 border rounded-lg">
-        <button id="register-btn" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">註冊</button>
-        <div class="text-center text-sm text-gray-500">或</div>
-        <button id="google-register-btn" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center gap-2">
-          <span>🔍</span>
-          Google 註冊
-        </button>
-      </div>
-    </div>
-  </div>
-
-
   <div class="min-h-screen flex flex-col gap-4 p-4 max-w-4xl mx-auto">
     <!-- 左：商品庫 / 匯入 / 模板選擇 -->
     <aside class="space-y-4">
+      <div class="bg-white rounded-2xl shadow p-4">
+        <h2 class="text-lg font-bold mb-3">登入（示意，一鍵登入）</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="login-google" class="px-3 py-2 rounded-xl bg-emerald-600 text-white">Google</button>
+          <button id="login-facebook" class="px-3 py-2 rounded-xl bg-sky-600 text-white">Facebook</button>
+          <button id="login-line" class="px-3 py-2 rounded-xl bg-green-600 text-white">LINE</button>
+          <div class="grow"></div>
+          <span id="usage-display" class="text-sm font-medium"></span>
+          <span id="login-state" class="text-xs text-slate-500">未登入（需登入才能新增樣式/釘選/刪除）</span>
+          <button id="reset-data" class="ml-2 px-2 py-1 rounded-lg border text-xs">重置本機資料</button>
+          <button id="reset-user" class="ml-1 px-2 py-1 rounded-lg border text-xs bg-yellow-100">重置用戶</button>
+        </div>
+      </div>
 
       <!-- 新增：店家與 DM 卡片 -->
       <div class="bg-white rounded-2xl shadow p-4 acc" id="shop-camp-card" data-acc-key="shop-camp">
@@ -345,8 +249,9 @@
         </div>
       </div>
 
-      <!-- 1) 新增商品（改為商品庫內建行新增，不再獨立卡片） -->
-      <div class="hidden" data-acc-key="add-product">
+      <!-- 1) 新增商品 -->
+      <div class="bg-white rounded-2xl shadow p-4 acc" data-acc-key="add-product">
+        <h2 class="text-lg font-bold mb-3 acc-title" aria-expanded="false">新增商品 <span class="chev"></span></h2>
         <form id="product-form" class="space-y-3">
           <input class="w-full rounded-xl border p-2" name="name" placeholder="商品名稱" required />
           <div class="grid grid-cols-2 gap-2">
@@ -362,17 +267,9 @@
             <button type="button" id="pick-img" class="px-3 py-2 rounded-xl bg-slate-800 text-white">上傳主圖</button>
             <span id="img-name" class="text-sm text-slate-500">尚未選擇</span>
           </div>
-          <div class="text-xs text-slate-500 leading-5 bg-slate-50 rounded-lg p-3">
-            建議圖片比例/尺寸（避免輸出時被拉伸）：
-            <ul class="list-disc pl-5 mt-1 space-y-1">
-              <li>九宮格：建議比例 1:1 或 4:5；建議尺寸 ≥ 1080×1080。</li>
-              <li>清單：建議比例 1:1；建議尺寸 ≥ 800×800（越大越清晰）。</li>
-              <li>單品（左右版）：建議比例 4:5；建議尺寸 ≥ 1200×1500。</li>
-              <li>單品（滿版背景）：固定 4:5（1080×1350），建議上傳 ≥ 1080×1350。</li>
-            </ul>
-          </div>
           <button type="submit" class="w-full py-2 rounded-xl bg-indigo-600 text-white font-semibold">加入商品庫</button>
         </form>
+        
       </div>
 
       <!-- DM 製作設定（大項） -->
@@ -388,15 +285,7 @@
           <button id="preset-add-btn" class="px-3 py-2 rounded-xl bg-indigo-600 text-white">新增</button>
         </div>
         <div id="preset-list" class="flex flex-wrap gap-2"></div>
-        <div class="text-xs text-slate-500 mt-2 space-y-1">
-          <p>四顆制式預設會先顯示。登入後可新增/刪除/釘選（會儲存到帳號）。</p>
-          <p class="text-blue-600 font-medium">💡 新增樣式會包含：</p>
-          <ul class="list-disc pl-4 space-y-0.5">
-            <li>模板與圖片樣式設定（模板類型、圖片填充、對齊、比例等）</li>
-            <li>DM顯示項目設定（店家名稱、方案名稱、聯絡方式、說明、徽章、邊框等）</li>
-            <li>所有模板專用設定（九宮格、單品、清單的專用選項）</li>
-          </ul>
-        </div>
+        <p class="text-xs text-slate-500 mt-2">四顆制式預設會先顯示。登入後可新增/刪除/釘選（會儲存到帳號）。</p>
           </div>
       </div>
 
@@ -468,91 +357,17 @@
               <option value="right">靠右</option>
             </select>
           </div>
-          <!-- 單品左右版專用設定 -->
-          <div id="single-settings" class="hidden">
           <div>
-              <label class="block text-sm text-slate-600">圖片顯示比例</label>
-              <select id="single-img-ratio" class="w-full rounded-xl border p-2">
+            <label class="block text-sm text-slate-600">圖片框比例（單品/清單）</label>
+            <select id="ratio-select" class="w-full rounded-xl border p-2">
               <option value="1/1">1:1（正方）</option>
               <option value="4/5" selected>4:5（IG 推薦）</option>
               <option value="3/4">3:4</option>
               <option value="16/9">16:9（橫式）</option>
             </select>
           </div>
-            <div>
-              <label class="block text-sm text-slate-600">卡片顯示比例</label>
-              <select id="single-card-ratio" class="w-full rounded-xl border p-2">
-                <option value="0.4">40%</option>
-                <option value="0.5" selected>50%</option>
-                <option value="0.6">60%</option>
-                <option value="0.7">70%</option>
-              </select>
         </div>
-            <div>
-              <label class="block text-sm text-slate-600">文字顯示比例</label>
-              <select id="single-text-ratio" class="w-full rounded-xl border p-2">
-                <option value="0.3">30%</option>
-                <option value="0.4" selected>40%</option>
-                <option value="0.5">50%</option>
-                <option value="0.6">60%</option>
-              </select>
-            </div>
-          </div>
-          <!-- 單品滿版專用設定 -->
-          <div id="singlefull-settings" class="hidden">
-            <div>
-              <label class="block text-sm text-slate-600">圖片顯示比例</label>
-              <select id="singlefull-img-ratio" class="w-full rounded-xl border p-2">
-                <option value="1/1">1:1（正方）</option>
-                <option value="4/5" selected>4:5（IG 推薦）</option>
-                <option value="3/4">3:4</option>
-                <option value="16/9">16:9（橫式）</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm text-slate-600">字體比例調整</label>
-              <select id="singlefull-font-ratio" class="w-full rounded-xl border p-2">
-                <option value="0.8">80%</option>
-                <option value="0.9">90%</option>
-                <option value="1.0" selected>100%</option>
-                <option value="1.1">110%</option>
-                <option value="1.2">120%</option>
-              </select>
-            </div>
-          </div>
-          <!-- 清單專用設定 -->
-          <div id="list-settings" class="hidden">
-            <div>
-              <label class="block text-sm text-slate-600">圖片顯示比例</label>
-              <select id="list-img-ratio" class="w-full rounded-xl border p-2">
-                <option value="1/1" selected>1:1（正方）</option>
-                <option value="4/5">4:5（IG 推薦）</option>
-                <option value="3/4">3:4</option>
-                <option value="16/9">16:9（橫式）</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm text-slate-600">圖卡顯示比例</label>
-              <select id="list-card-ratio" class="w-full rounded-xl border p-2">
-                <option value="0.15">15%</option>
-                <option value="0.2" selected>20%</option>
-                <option value="0.25">25%</option>
-                <option value="0.3">30%</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm text-slate-600">文字顯示比例</label>
-              <select id="list-text-ratio" class="w-full rounded-xl border p-2">
-                <option value="0.4">40%</option>
-                <option value="0.5" selected>50%</option>
-                <option value="0.6">60%</option>
-                <option value="0.7">70%</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <!-- 九宮格專用設定 -->
-        <div id="grid9-settings" class="mt-4 space-y-2 hidden">
+        <div class="mt-4 space-y-2">
           <label class="block text-sm text-slate-600">（九宮格）卡片高度</label>
           <select id="grid-card-h" class="w-full rounded-xl border p-2">
             <option value="320">小（320px）</option>
@@ -566,18 +381,22 @@
             <option value="0.6" selected>60%</option>
             <option value="0.7">70%</option>
           </select>
-          <label class="block text-sm text-slate-600 mt-2">（九宮格）文字顯示比例</label>
-          <select id="grid-text-ratio" class="w-full rounded-xl border p-2">
-            <option value="0.3">30%</option>
-            <option value="0.4" selected>40%</option>
-            <option value="0.5">50%</option>
-            <option value="0.6">60%</option>
-          </select>
           <label class="inline-flex items-center gap-2 text-sm"><input id="grid-fill" type="checkbox" class="rounded" checked> 不足 9 件以空白卡補齊（固定 3×3）</label>
         </div>
         </div>
       </div>
 
+        <!-- 5) 批量匯入（移到模板樣式下方，並新增「下載範本」） -->
+        <div class="acc" data-acc-key="csv-import">
+          <h3 class="text-base font-semibold mb-2 acc-title" aria-expanded="false">批量匯入（CSV/Excel）<span class="chev"></span></h3>
+          <div>
+        <p class="text-sm text-slate-600 mb-2">欄位：name, price, originalPrice, desc, imageUrl</p>
+        <input type="file" id="csv-input" accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        <div class="mt-2">
+          <button id="btn-download-template" class="px-3 py-2 rounded-xl border text-sm">下載空白範本</button>
+        </div>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -588,15 +407,23 @@
         <span class="chev"></span>
       </div>
       <div class="acc-content p-4 pt-0">
-        
+        <!-- AI描述生成工具 -->
+        <div class="mb-4 p-3 bg-blue-50 rounded-xl">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-blue-800">AI描述生成工具</h3>
+            <span class="text-xs text-blue-600">智能生成商品描述</span>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="batch-ai-desc" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+              為所有商品生成AI描述
+            </button>
+            <button type="button" id="ai-desc-selected" class="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
+              為選中商品生成
+            </button>
+          </div>
+        </div>
         
         <div id="product-table" class="overflow-auto max-h-[50vh]">
-          <div class="flex gap-2 mb-2">
-            <button id="btn-delete-selected" class="px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700">刪除已勾選</button>
-            <button id="btn-delete-all" class="px-3 py-1 rounded bg-red-700 text-white text-xs hover:bg-red-800">刪除全部</button>
-            <button id="btn-ai-desc-selected" class="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700">為勾選生成AI描述</button>
-            <button id="btn-add-product-inline" class="px-3 py-1 rounded bg-emerald-600 text-white text-xs hover:bg-emerald-700">新增商品</button>
-          </div>
           <table class="w-full text-sm">
             <thead class="sticky top-0 bg-slate-100">
               <tr>
@@ -606,7 +433,6 @@
                 <th class="p-2 text-left">售價</th>
                 <th class="p-2 text-left">原價</th>
                 <th class="p-2 text-left">描述</th>
-                <th class="p-2 text-left">操作</th>
               </tr>
             </thead>
             <tbody id="product-tbody"></tbody>
@@ -664,9 +490,6 @@
   (function(){
     'use strict';
 
-    // ===== 全域常數 =====
-    const PRESET_KEY_PREFIX = 'dm-presets-v4:'; // 每個帳號一份（只讀用）
-
     // ===== 狀態 =====
     const state = {
       user: null, // { id, name, email, isPremium, usageCount, maxUsage }
@@ -680,18 +503,6 @@
       gridCardH: 360,
       gridFill: true,
       gridImgFrac: 0.6,
-      gridTextRatio: 0.4,
-      // 單品左右版設定
-      singleImgRatio: '4/5',
-      singleCardRatio: 0.5,
-      singleTextRatio: 0.4,
-      // 單品滿版設定
-      singlefullImgRatio: '4/5',
-      singlefullFontRatio: 1.0,
-      // 清單設定
-      listImgRatio: '1/1',
-      listCardRatio: 0.2,
-      listTextRatio: 0.5,
       selectedShopId: null,
       selectedCampaignId: null,
       // 藍星支付設定
@@ -706,38 +517,18 @@
       usageLimits: {
         freeTrial: 3, // 免費試用次數
         premiumPrice: 299, // 付費價格 (台幣)
-        premiumFeatures: ['unlimited_usage', 'all_templates', 'high_res_export', 'no_watermark']
-      },
-      // 浮水印設定
-      watermark: {
-        text: '掃描 QR 立即下載',
-        logoUrl: 'DMSD.png', // 你的LOGO文件
-        showWatermark: true // 免費版顯示浮水印
+        premiumFeatures: ['unlimited_usage', 'all_templates', 'high_res_export']
       }
     };
 
     // ===== DOM 快取 =====
     const els = {
-      showLoginModal: document.getElementById('show-login-modal'),
-      showRegisterModal: document.getElementById('show-register-modal'),
-      loginModal: document.getElementById('login-modal'),
-      registerModal: document.getElementById('register-modal'),
-      closeLoginModal: document.getElementById('close-login-modal'),
-      closeRegisterModal: document.getElementById('close-register-modal'),
-      loginEmail: document.getElementById('login-email'),
-      loginPassword: document.getElementById('login-password'),
-      rememberLogin: document.getElementById('remember-login'),
-      loginBtn: document.getElementById('login-btn'),
-      registerName: document.getElementById('register-name'),
-      registerEmail: document.getElementById('register-email'),
-      registerPassword: document.getElementById('register-password'),
-      registerConfirmPassword: document.getElementById('register-confirm-password'),
-      registerBtn: document.getElementById('register-btn'),
-      googleLoginBtn: document.getElementById('google-login-btn'),
-      googleRegisterBtn: document.getElementById('google-register-btn'),
-      logoutBtn: document.getElementById('logout-btn'),
-      adminPanel: document.getElementById('admin-panel'),
+      loginGoogle: document.getElementById('login-google'),
+      loginFacebook: document.getElementById('login-facebook'),
+      loginLINE: document.getElementById('login-line'),
       loginState: document.getElementById('login-state'),
+      resetData: document.getElementById('reset-data'),
+      resetUser: document.getElementById('reset-user'),
       // Shops & Campaigns
       shopCard: document.getElementById('shop-camp-card'),
       shopPills: document.getElementById('shop-pill-list'),
@@ -841,7 +632,7 @@
       } else {
         createNewUser();
       }
-      // updateUsageDisplay() 將在初始化完成後調用
+      updateUsageDisplay();
     }
     
     function createNewUser() {
@@ -865,27 +656,13 @@
 
     function updateUsageDisplay() {
       const usageEl = document.getElementById('usage-display');
-      console.log('updateUsageDisplay called:', {
-        usageEl: usageEl,
-        user: state.user
-      });
-      
-      if (usageEl && state.user) {
-        const usageCount = state.user.usageCount || 0;
-        const maxUsage = state.user.maxUsage || 10;
-        
-        if (state.user.isPremium || maxUsage === Infinity) {
+      if (usageEl) {
+        const remaining = state.user.maxUsage - state.user.usageCount;
+        if (state.user.isPremium) {
           usageEl.innerHTML = '<span class="text-green-600 font-semibold">∞ 無限使用</span>';
         } else {
-          const remaining = maxUsage - usageCount;
           usageEl.innerHTML = `<span class="text-orange-600">剩餘 ${remaining} 次</span>`;
         }
-        console.log('使用次數顯示已更新:', { usageCount, maxUsage, remaining: maxUsage - usageCount });
-      } else {
-        console.log('無法更新使用次數顯示:', {
-          usageEl: !!usageEl,
-          user: !!state.user
-        });
       }
     }
 
@@ -920,51 +697,6 @@
       saveUser();
       updateUsageDisplay();
       toast('🎉 恭喜！已解鎖高級功能！');
-    }
-
-    // ===== 浮水印系統 =====
-    function shouldShowWatermark() {
-      // 付費用戶不顯示浮水印
-      if (state.user && state.user.isPremium) {
-        return false;
-      }
-      // 免費用戶顯示浮水印
-      return state.watermark.showWatermark;
-    }
-
-    function createWatermark() {
-      if (!shouldShowWatermark()) {
-        return '';
-      }
-
-      // 檢查模板類型
-      const isGrid9 = state.template === 'grid9';
-      const isSingle = state.template === 'single';
-      const isSingleFull = state.template === 'singleFull';
-      const isList = state.template === 'list';
-      
-      let bottomClass = 'bottom-0';
-      // 改回黑色 LOGO，所有模板使用 DMSD.png
-      const logoSrc = state.watermark?.logoUrl || 'DMSD.png';
-      if (isGrid9) {
-        // 上調40px：從-60px到-20px
-        bottomClass = 'bottom-[-20px]';
-        console.log('九宮格浮水印LOGO位置設置為:', bottomClass);
-      } else if (isSingle) {
-        bottomClass = 'bottom-[-20px]'; // 上調40px：從-60px到-20px
-      } else if (isSingleFull) {
-        bottomClass = 'bottom-5'; // 向上移動5px
-      } else if (isList) {
-        // 與九宮格一致
-        bottomClass = 'bottom-[-20px]';
-      }
-      
-      console.log('createWatermark - template:', state.template, 'bottomClass:', bottomClass);
-      return `
-        <div class="absolute ${bottomClass} right-6 z-50">
-          <img src="${logoSrc}" alt="Logo" class="h-24 w-auto drop-shadow-lg brightness-0 invert" />
-        </div>
-      `;
     }
 
     // ===== 藍星支付系統 =====
@@ -1020,7 +752,6 @@
               <li>• 無限次使用</li>
               <li>• 所有模板</li>
               <li>• 高解析度輸出</li>
-              <li>• 去除浮水印</li>
             </ul>
           </div>
           <div class="flex gap-3">
@@ -1037,16 +768,6 @@
       document.body.appendChild(modal);
       
       document.getElementById('pay-now').addEventListener('click', () => {
-        // 模擬解鎖功能（測試用）
-        if (confirm('是否要模擬解鎖高級功能？（測試用）\n\n點擊「確定」：模擬解鎖\n點擊「取消」：跳轉到藍星支付')) {
-          // 模擬解鎖
-          unlockPremium();
-          alert('🎉 高級功能已解鎖！\n\n• 無限次使用\n• 所有模板\n• 高解析度輸出\n• 去除浮水印');
-          modal.remove();
-          return;
-        }
-        
-        // 實際付費流程
         processPayment();
         modal.remove();
       });
@@ -1081,67 +802,6 @@
       toast('正在跳轉到付款頁面...');
     }
 
-    function startLocalServer() {
-      // 創建一個簡單的本地服務器啟動指南
-      const modal = document.createElement('div');
-      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-      modal.innerHTML = `
-        <div class="bg-white rounded-xl p-8 max-w-2xl mx-4">
-          <h2 class="text-2xl font-bold mb-4">啟動本地HTTP服務器</h2>
-          <div class="space-y-4">
-            <p class="text-gray-700">為了避免跨域限制，請使用以下方法之一啟動本地服務器：</p>
-            
-            <div class="bg-gray-50 p-4 rounded-lg">
-              <h3 class="font-semibold mb-2">方法1：使用Python（推薦）</h3>
-              <div class="bg-black text-green-400 p-3 rounded font-mono text-sm">
-                <div>cd C:\\XC_MMCT</div>
-                <div>python -m http.server 8000</div>
-              </div>
-              <p class="text-sm text-gray-600 mt-2">然後在瀏覽器中訪問：<code class="bg-gray-200 px-1 rounded">http://localhost:8000</code></p>
-            </div>
-            
-            <div class="bg-gray-50 p-4 rounded-lg">
-              <h3 class="font-semibold mb-2">方法2：使用Node.js</h3>
-              <div class="bg-black text-green-400 p-3 rounded font-mono text-sm">
-                <div>cd C:\\XC_MMCT</div>
-                <div>npx http-server -p 8000</div>
-              </div>
-              <p class="text-sm text-gray-600 mt-2">然後在瀏覽器中訪問：<code class="bg-gray-200 px-1 rounded">http://localhost:8000</code></p>
-            </div>
-            
-            <div class="bg-gray-50 p-4 rounded-lg">
-              <h3 class="font-semibold mb-2">方法3：使用VS Code Live Server</h3>
-              <p class="text-sm text-gray-600">如果你使用VS Code，可以安裝「Live Server」擴展，然後右鍵點擊index.html選擇「Open with Live Server」</p>
-            </div>
-          </div>
-          
-          <div class="flex gap-3 mt-6">
-            <button id="copy-commands" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
-              複製命令
-            </button>
-            <button id="close-server-modal" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-              關閉
-            </button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(modal);
-      
-      document.getElementById('copy-commands').addEventListener('click', () => {
-        const commands = 'cd C:\\XC_MMCT\npython -m http.server 8000';
-        navigator.clipboard.writeText(commands).then(() => {
-          alert('命令已複製到剪貼板！\n\n請在命令提示符中執行這些命令，然後在瀏覽器中訪問 http://localhost:8000');
-        }).catch(() => {
-          alert('無法複製到剪貼板，請手動複製以下命令：\n\ncd C:\\XC_MMCT\npython -m http.server 8000');
-        });
-      });
-      
-      document.getElementById('close-server-modal').addEventListener('click', () => {
-        modal.remove();
-      });
-    }
-
     // 在某些環境（內嵌容器/行動瀏覽器）會封鎖 alert/confirm/prompt。
     // 使用安全版 confirm：若不可用則默認通過，避免操作卡住。
     function safeConfirm(msg){
@@ -1154,259 +814,12 @@
       return true;
     }
 
-    // ===== 真正的登入系統 =====
-    const USERS_KEY = 'dm-users-v1';
-    const CURRENT_USER_KEY = 'dm-current-user-v1';
-    
-    // 初始化用戶數據
-    function initUsers() {
-      if (!localStorage.getItem(USERS_KEY)) {
-        // 創建默認管理員帳號
-        const defaultUsers = {
-          'egege5513gegergdsf': {
-            id: 'egege5513gegergdsf',
-            email: 'egege5513gegergdsf',
-            name: '管理員',
-            password: 'dgfdgdfgdgf5454', // 實際應用中應該加密
-            isPremium: true,
-            maxUsage: Infinity,
-            usageCount: 0,
-            createdAt: new Date().toISOString()
-          }
-        };
-        localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
-      }
-    }
-    
-    // 獲取所有用戶
-    function getAllUsers() {
-      try {
-        return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
-      } catch {
-        return {};
-      }
-    }
-    
-    // 保存用戶數據
-    function saveUsers(users) {
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    }
-    // 讀取管理員Email清單：
-    // 可在瀏覽器 Console 設定：
-    //   localStorage.setItem('dm-admin-emails','a@x.com,b@y.com')
-    // 仍相容舊的 'dm-admin-email'（單一Email）
-    function getAdminEmails(){
-      const list = [];
-      // 來自 config.js
-      if (window.APP_CONFIG && Array.isArray(window.APP_CONFIG.adminEmails)){
-        window.APP_CONFIG.adminEmails.forEach(e=>{ if (e) list.push(String(e).trim().toLowerCase()); });
-      }
-      // 來自 localStorage（可動態覆蓋/追加）
-      (localStorage.getItem('dm-admin-emails')||'')
-        .split(',')
-        .map(s=>s.trim().toLowerCase())
-        .filter(Boolean)
-        .forEach(e=> list.push(e));
-      const legacy = (localStorage.getItem('dm-admin-email')||'').trim().toLowerCase();
-      if (legacy) list.push(legacy);
-      return new Set(list);
-    }
-    
-    // 清除所有登入狀態（用於強制登出）
-    function clearAllLoginStates() {
-      // 清除所有可能的登入相關鍵
-      const keysToRemove = [
-        'dm_current_user',
-        'dm-current-user-v1',
-        'dm-current-user',
-        'current_user',
-        'user_session'
-      ];
-      
-      keysToRemove.forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      console.log('已清除所有登入狀態');
-    }
-    
-    // 獲取當前用戶
-    function getCurrentUser() {
-      try {
-        const userData = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
-        if (!userData) return null;
-        
-        // 檢查是否應該自動登出
-        if (!userData.rememberLogin) {
-          // 如果沒有勾選維持自動登入，清除登入狀態
-          localStorage.removeItem(CURRENT_USER_KEY);
-          return null;
-        }
-        
-        // 檢查登入時間是否超過24小時
-        if (userData.loginTime) {
-          const loginTime = new Date(userData.loginTime);
-          const now = new Date();
-          const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
-          if (hoursDiff > 24) {
-            // 超過24小時自動登出
-            localStorage.removeItem(CURRENT_USER_KEY);
-            return null;
-          }
-        }
-        
-        return userData;
-      } catch {
-        return null;
-      }
-    }
-    
-    // 保存當前用戶
-    function saveCurrentUser(user, rememberLogin = false) {
-      if (user) {
-        const userData = {
-          ...user,
-          rememberLogin: rememberLogin,
-          loginTime: new Date().toISOString()
-        };
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userData));
-      } else {
-        localStorage.removeItem(CURRENT_USER_KEY);
-      }
-    }
-    
-    // 簡單的密碼驗證（實際應用中應該使用更安全的方法）
-    function validatePassword(password) {
-      return password && password.length >= 6;
-    }
-    
-    // 註冊新用戶
-    function registerUser(email, password, name) {
-      if (!email || !password || !name) {
-        return { success: false, message: '請填寫所有欄位' };
-      }
-      
-      if (!validatePassword(password)) {
-        return { success: false, message: '密碼至少需要6個字符' };
-      }
-      
-      const users = getAllUsers();
-      if (users[email]) {
-        return { success: false, message: '此電子郵件已被註冊' };
-      }
-      
-      const newUser = {
-        id: email,
-        email: email,
-        name: name,
-        password: password, // 實際應用中應該加密
-        isPremium: false,
-        maxUsage: 10, // 免費用戶限制
-        usageCount: 0,
-        createdAt: new Date().toISOString()
-      };
-      
-      users[email] = newUser;
-      saveUsers(users);
-      
-      return { success: true, message: '註冊成功！', user: newUser };
-    }
-    
-    // 用戶登入
-    function loginUser(email, password, rememberLogin = false) {
-      if (!email || !password) {
-        return { success: false, message: '請填寫電子郵件和密碼' };
-      }
-      
-      const users = getAllUsers();
-      const user = users[email];
-      
-      if (!user) {
-        return { success: false, message: '用戶不存在' };
-      }
-      
-      if (user.password !== password) {
-        return { success: false, message: '密碼錯誤' };
-      }
-      
-      // 更新用戶狀態
-      state.user = user;
-      saveCurrentUser(user, rememberLogin);
-      setUser(user);
-      
-      // 檢查是否為管理員
-      if (user.isAdmin || user.email === 'egege5513gegergdsf') {
-        return { success: true, message: `管理員登入成功，歡迎 ${user.name}！`, user: user };
-      } else {
-        return { success: true, message: `歡迎回來，${user.name}！`, user: user };
-      }
-    }
-    
-    
-    // Google 登入（模擬）
-    function loginWithGoogle(rememberLogin = false) {
-      // 模擬Google登入流程
-      const googleUser = {
-        id: 'google_' + Date.now(),
-        email: 'user@gmail.com',
-        name: 'Google用戶',
-        password: '', // Google登入不需要密碼
-        isPremium: false,
-        maxUsage: 10,
-        usageCount: 0,
-        loginType: 'google',
-        createdAt: new Date().toISOString()
-      };
-      
-      // 保存Google用戶到本地
-      const users = getAllUsers();
-      users[googleUser.email] = googleUser;
-      saveUsers(users);
-      
-      // 更新用戶狀態
-      state.user = googleUser;
-      saveCurrentUser(googleUser, rememberLogin);
-      setUser(googleUser);
-      
-      return { success: true, message: 'Google登入成功！', user: googleUser };
-    }
-    
-    // 用戶登出
-    function logoutUser() {
-      state.user = null;
-      saveCurrentUser(null);
-      setUser(null);
-      toast('已登出');
-    }
-    
+    // ===== 登入（示意） =====
     function setUser(u){
       state.user = u;
-      els.loginState && (els.loginState.textContent = u ? scopeString() : '未登入（需登入才能新增樣式/釘選/刪除）');
+      els.loginState.textContent = u ? scopeString() : '未登入（需登入才能新增樣式/釘選/刪除）';
       updatePresetControls();
       updateAccordionLock();
-      
-      // 更新頂部藍條顯示
-      if (u) {
-        els.showLoginModal && els.showLoginModal.classList.add('hidden');
-        els.showRegisterModal && els.showRegisterModal.classList.add('hidden');
-        els.logoutBtn && els.logoutBtn.classList.remove('hidden');
-        
-        // 顯示管理員按鈕（如果是管理員）
-        if (u.isAdmin || (u.email && getAdminEmails().has(u.email.toLowerCase()))) {
-          els.adminPanel && els.adminPanel.classList.remove('hidden');
-        } else {
-          els.adminPanel && els.adminPanel.classList.add('hidden');
-        }
-      } else {
-        els.showLoginModal && els.showLoginModal.classList.remove('hidden');
-        els.showRegisterModal && els.showRegisterModal.classList.remove('hidden');
-        els.logoutBtn && els.logoutBtn.classList.add('hidden');
-        els.adminPanel && els.adminPanel.classList.add('hidden');
-      }
-      
-      // 更新使用次數顯示
-      updateUsageDisplay();
-      
       // 清理測試殘留資料（避免顯示店T19等測試店家）
       try { cleanupTestArtifacts(); renderShopPills(); } catch(e) { console.warn('cleanupTestArtifacts error', e); }
     }
@@ -1414,16 +827,10 @@
     const SHOPS_KEY_PREFIX = 'dm-shops-v1:';
     const CAMPS_KEY_PREFIX = 'dm-campaigns-v1:'; // {userId}:{shopId}
     const PRESET_V5_PREFIX = 'dm-presets-v5:'; // {userId}:{shopId}:{campaignId}
-    const PRODUCTS_KEY_PREFIX = 'dm-products-v1:'; // {userId}
 
     function shopsKey(){ return state.user ? SHOPS_KEY_PREFIX + state.user.id : null; }
     function campsKey(shopId){ return state.user && shopId ? `${CAMPS_KEY_PREFIX}${state.user.id}:${shopId}` : null; }
     function presetsV5Key(shopId, campId){ return state.user && shopId && campId ? `${PRESET_V5_PREFIX}${state.user.id}:${shopId}:${campId}` : null; }
-    function productsKey(){ 
-      const key = state.user ? PRODUCTS_KEY_PREFIX + state.user.id : null;
-      console.log('productsKey() 返回:', key, 'state.user:', state.user?.id, 'state.user.email:', state.user?.email);
-      return key;
-    }
 
     function loadShops(){
       const k = shopsKey(); if (!k) return [];
@@ -1432,73 +839,6 @@
     function saveShops(list){ const k=shopsKey(); if (!k){ alert('請先登入'); return false; } try{ localStorage.setItem(k, JSON.stringify(list)); return true; } catch(e){ alert('儲存店家失敗'); return false; } }
     function loadCamps(shopId){ const k=campsKey(shopId); if (!k) return []; try{ const raw=localStorage.getItem(k); const arr=JSON.parse(raw||'[]'); return Array.isArray(arr)?arr:[]; }catch{ return []; } }
     function saveCamps(shopId, list){ const k=campsKey(shopId); if (!k){ alert('請先登入'); return false; } try{ localStorage.setItem(k, JSON.stringify(list)); return true; } catch{ alert('儲存方案失敗'); return false; } }
-    
-    // 商品資料持久化
-    function loadProducts(){
-      const k = productsKey(); 
-      console.log('loadProducts 被調用 - key:', k, 'user:', state.user?.id);
-      if (!k) {
-        console.log('loadProducts - 無用戶，返回空陣列');
-        return [];
-      }
-      try { 
-        const raw = localStorage.getItem(k); 
-        console.log('loadProducts - 從 localStorage 讀取:', raw ? '有資料' : '無資料');
-        const arr = JSON.parse(raw||'[]'); 
-        console.log('loadProducts - 解析後商品數量:', arr.length);
-        
-        // 檢查是否有 demo 商品或測試商品，如果有就清除
-        const hasDemoProducts = arr.some(p => 
-          p.name === '手作黑糖粉圓鮮奶 1L' || 
-          p.name === '低溫氣炸雞米花 500g' || 
-          p.name === '小農無毒牛番茄 2 斤' || 
-          p.name === '五花厚切燒肉片 600g' || 
-          p.name === '厚片蜂蜜吐司 6 片' ||
-          p.name === '測試品' ||
-          p.name === '453' ||
-          (p.name && p.name.length <= 3 && /^\d+$/.test(p.name)) // 清除純數字的商品名稱
-        );
-        
-        if (hasDemoProducts) {
-          console.log('檢測到 demo 商品，清除中...');
-          localStorage.removeItem(k);
-          return [];
-        }
-        
-        console.log('loadProducts - 返回商品數量:', arr.length);
-        console.log('loadProducts - 載入的商品:', arr.map(p => ({ id: p.id, name: p.name, updatedAt: p.updatedAt })));
-        return Array.isArray(arr)?arr:[]; 
-      } catch(e){ 
-        console.error('loadProducts error:', e);
-        return []; 
-      }
-    }
-    function saveProducts(list){ 
-      const k = productsKey(); 
-      console.log('saveProducts 被調用 - key:', k, 'user:', state.user?.id, 'products:', list.length);
-      if (!k){ 
-        console.warn('未登入，無法儲存商品，state.user:', state.user);
-        return false; 
-      } 
-      try{ 
-        // 直接覆蓋儲存，確保最新狀態被保存
-        const productsToSave = Array.isArray(list) ? list : [];
-        
-        // 為所有商品補上 updatedAt 時間戳
-        productsToSave.forEach(p => {
-          if (p && p.id && !p.updatedAt) {
-            p.updatedAt = new Date().toISOString();
-          }
-        });
-        
-        localStorage.setItem(k, JSON.stringify(productsToSave)); 
-        state.products = productsToSave; // 回寫記憶體，保持一致
-        console.log('saveProducts - 成功儲存到 key:', k, '商品數量:', productsToSave.length);
-        console.log('saveProducts - 儲存的商品:', productsToSave.map(p => ({ id: p.id, name: p.name, updatedAt: p.updatedAt })));
-        return true; 
-      } 
-      catch(e){ console.error('儲存商品失敗', e); return false; } 
-    }
 
     function findShopById(id){ return loadShops().find(s=>s.id===id)||null; }
     function findCampById(shopId, id){ return loadCamps(shopId).find(c=>c.id===id)||null; }
@@ -1743,137 +1083,55 @@
 
     function updateGating(){
       const disabled = !hasScopeReady();
-      const hasShop = !!state.selectedShopId;
-      const hasCampaign = !!state.selectedCampaignId;
-      
-      // DM製作設定區：有店家就可以使用
-      setCardLocked(document.querySelector('[data-acc-key="dm-settings"]'), !hasShop);
-      
-      // 樣式卡、預設樣式卡、顯示項目卡：需要店家和方案都選好
+      // 樣式卡、預設樣式卡、顯示項目卡：僅鎖內容，不鎖標題列
       setCardLocked(els.templateSelect.closest('.acc'), disabled);
       setCardLocked(els.presetList.closest('.acc'), disabled);
       setCardLocked(document.querySelector('[data-acc-key="dm-display"]'), disabled);
-      
-      
-      // 匯出：需要店家和方案都選好
+      // 匯出
       els.downloadPng.disabled = disabled; els.downloadPdf.disabled = disabled;
       els.downloadPng.classList.toggle('opacity-50', disabled); els.downloadPdf.classList.toggle('opacity-50', disabled);
     }
 
-    // 顯示登入彈窗
-    els.showLoginModal && els.showLoginModal.addEventListener('click', () => {
-      els.loginModal && els.loginModal.classList.remove('hidden');
-    });
-    
-    // 顯示註冊彈窗
-    els.showRegisterModal && els.showRegisterModal.addEventListener('click', () => {
-      els.registerModal && els.registerModal.classList.remove('hidden');
-    });
-    
-    // 關閉登入彈窗
-    els.closeLoginModal && els.closeLoginModal.addEventListener('click', () => {
-      els.loginModal && els.loginModal.classList.add('hidden');
-    });
-    
-    // 關閉註冊彈窗
-    els.closeRegisterModal && els.closeRegisterModal.addEventListener('click', () => {
-      els.registerModal && els.registerModal.classList.add('hidden');
-    });
-    
-    
-    // 登入按鈕事件（Firebase）
-    els.loginBtn && els.loginBtn.addEventListener('click', async () => {
-      const email = els.loginEmail ? els.loginEmail.value.trim() : '';
-      const password = els.loginPassword ? els.loginPassword.value.trim() : '';
-      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
-      if (!email || !password) return toast('請填寫完整資訊');
-      try {
-        await window.firebaseAuth.signIn(email, password, rememberLogin);
-        toast('登入成功');
-        els.loginModal && els.loginModal.classList.add('hidden');
-      } catch(e){ toast(e.message||'登入失敗'); }
-    });
-    
-    // 註冊按鈕事件（Firebase）
-    els.registerBtn && els.registerBtn.addEventListener('click', async () => {
-      const name = els.registerName.value.trim();
-      const email = els.registerEmail.value.trim();
-      const password = els.registerPassword.value.trim();
-      const confirmPassword = els.registerConfirmPassword.value.trim();
-      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
-      if (!name || !email || !password || !confirmPassword) return toast('請填寫完整資訊');
-      if (password !== confirmPassword) return toast('密碼確認不一致');
-      if (!validatePassword(password)) return toast('密碼長度至少6位');
-      try {
-        await window.firebaseAuth.signUp(email, password, rememberLogin);
-        toast('註冊成功');
-        els.registerModal && els.registerModal.classList.add('hidden');
-      } catch(e){ toast(e.message||'註冊失敗'); }
-    });
-    
-    // Google 登入（Firebase）
-    els.googleLoginBtn && els.googleLoginBtn.addEventListener('click', async () => {
-      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
-      try {
-        await window.firebaseAuth.googleSignIn(rememberLogin);
-        toast('Google 登入成功');
-        els.loginModal && els.loginModal.classList.add('hidden');
-      } catch(e){ toast(e.message||'Google 登入失敗'); }
-    });
-    
-    // Google 註冊（與登入相同流程）
-    els.googleRegisterBtn && els.googleRegisterBtn.addEventListener('click', async () => {
-      const rememberLogin = els.rememberLogin ? els.rememberLogin.checked : false;
-      try {
-        await window.firebaseAuth.googleSignIn(rememberLogin);
-        toast('Google 登入成功');
-        els.registerModal && els.registerModal.classList.add('hidden');
-      } catch(e){ toast(e.message||'Google 登入失敗'); }
-    });
-    
-    
-    // 登出（Firebase）
-    els.logoutBtn && els.logoutBtn.addEventListener('click', async () => {
-      try { await window.firebaseAuth.signOut(); toast('已登出'); } catch(e){ toast('登出失敗'); }
-    });
-    
-    // Enter鍵登入
-    els.loginPassword.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        els.loginBtn.click();
-      }
-    });
-    
-    // 註冊表單Enter鍵支持
-    els.registerConfirmPassword.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        els.registerBtn.click();
-      }
-    });
-    
-    
-    // 管理員面板
-    els.adminPanel.addEventListener('click', () => {
-      window.open('admin.html', '_blank');
-    });
-    
-    // 點擊彈窗外部關閉彈窗
-    els.loginModal.addEventListener('click', (e) => {
-      if (e.target === els.loginModal) {
-        els.loginModal.classList.add('hidden');
-      }
-    });
-    
-    els.registerModal.addEventListener('click', (e) => {
-      if (e.target === els.registerModal) {
-        els.registerModal.classList.add('hidden');
-      }
-    });
-    
+    function fakeLogin(provider){
+      // 一鍵登入：不使用 prompt，避免被環境封鎖
+      const email = `tester+${provider.toLowerCase()}@local`;
+      setUser({ id: email, name: provider });
+      reloadPresets();
+    }
+
+    els.loginGoogle.addEventListener('click', () => fakeLogin('Google'));
+    els.loginFacebook.addEventListener('click', () => fakeLogin('Facebook'));
+    els.loginLINE.addEventListener('click', () => fakeLogin('LINE'));
 
     // 重置本機資料（清空目前帳號相關的 shops/campaigns/presets/accordion）
+    els.resetData.addEventListener('click', ()=>{
+      try{
+        if (!state.user){ localStorage.clear(); location.reload(); return; }
+        const uid = state.user.id;
+        Object.keys(localStorage).forEach(k=>{
+          if (k.startsWith('dm-shops-v1:'+uid) || k.startsWith('dm-campaigns-v1:'+uid) || k.startsWith('dm-presets-v5:'+uid) || k.startsWith('dm-presets-v4:'+uid) || k.startsWith('dm-acc-v1:'+uid)){
+            localStorage.removeItem(k);
+          }
+        });
+        // 也刪除所有該帳號下各店家的 campaigns
+        const shops = loadShops();
+        for (const s of shops){ const k = `dm-campaigns-v1:${uid}:${s.id}`; localStorage.removeItem(k); }
+        // 退出登入，回到初始狀態
+        setUser(null); state.selectedShopId=null; state.selectedCampaignId=null; renderShopPills(); renderCampaignPills(); updateGating(); renderChosenSummary(); reloadPresets(); toast('已重置本機資料');
+      }catch(e){ console.error(e); toast('重置失敗，請手動清除瀏覽器儲存'); }
+    });
 
-
+    // 重置用戶數據（僅重置使用次數和付費狀態）
+    els.resetUser.addEventListener('click', ()=>{
+      try{
+        localStorage.removeItem('dm_user');
+        initUser();
+        toast('用戶數據已重置，使用次數恢復為3次');
+      }catch(e){ 
+        console.error(e); 
+        toast('重置失敗'); 
+      }
+    });
 
     // ===== 圖片處理 =====
     function fileToDataUrl(file) {
@@ -2007,12 +1265,12 @@
 
     // ===== 商品輸入 =====
     let pendingImage = null;
-    els.pickImg && els.imgInput && els.pickImg.addEventListener('click', () => els.imgInput.click());
+    els.pickImg.addEventListener('click', () => els.imgInput.click());
     
     // AI描述生成按鈕
     const aiDescBtn = document.getElementById('ai-desc-btn');
     if (aiDescBtn) {
-      aiDescBtn && aiDescBtn.addEventListener('click', () => {
+      aiDescBtn.addEventListener('click', () => {
         const form = aiDescBtn.closest('form');
         const nameInput = form.querySelector('input[name="name"]');
         const priceInput = form.querySelector('input[name="price"]');
@@ -2042,15 +1300,110 @@
           aiDescBtn.disabled = false;
           
           // 顯示成功提示
-          (window.toast||alert)('AI描述生成完成！');
+          showToast('AI描述生成完成！');
         }, 800);
       });
     }
     
-    // 已移除舊的頂部批量AI描述按鈕，統一由商品庫工具列提供
+    // 批量AI描述生成
+    const batchAiDescBtn = document.getElementById('batch-ai-desc');
+    if (batchAiDescBtn) {
+      batchAiDescBtn.addEventListener('click', () => {
+        // 找出沒有描述的商品
+        const productsWithoutDesc = state.products.filter(p => !p.desc || p.desc.trim() === '');
+        
+        if (productsWithoutDesc.length === 0) {
+          showToast('所有商品都已有描述！');
+          return;
+        }
+        
+        // 顯示載入狀態
+        batchAiDescBtn.textContent = `正在生成 ${productsWithoutDesc.length} 個描述...`;
+        batchAiDescBtn.disabled = true;
+        
+        // 批量生成描述
+        let completed = 0;
+        productsWithoutDesc.forEach((product, index) => {
+          setTimeout(() => {
+            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
+            product.desc = aiDescription;
+            completed++;
+            
+            // 立即更新該行的顯示
+            const textarea = document.querySelector(`textarea[data-id="${product.id}"]`);
+            if (textarea) {
+              textarea.value = aiDescription;
+              textarea.style.backgroundColor = '#f0f9ff';
+              setTimeout(() => {
+                textarea.style.backgroundColor = '';
+              }, 1000);
+            }
+            
+            if (completed === productsWithoutDesc.length) {
+              // 全部完成
+              batchAiDescBtn.textContent = '為所有商品生成AI描述';
+              batchAiDescBtn.disabled = false;
+              showToast(`成功為 ${productsWithoutDesc.length} 個商品生成描述！`);
+              
+              // 重新渲染DM預覽
+              renderDM();
+            }
+          }, index * 200); // 每個商品間隔200ms，避免太快
+        });
+      });
+    }
     
+    // 為選中商品生成AI描述
+    const aiDescSelectedBtn = document.getElementById('ai-desc-selected');
+    if (aiDescSelectedBtn) {
+      aiDescSelectedBtn.addEventListener('click', () => {
+        // 找出選中且沒有描述的商品
+        const selectedProducts = state.products.filter(p => 
+          state.selection.has(p.id) && (!p.desc || p.desc.trim() === '')
+        );
+        
+        if (selectedProducts.length === 0) {
+          showToast('選中的商品都已有描述！');
+          return;
+        }
+        
+        // 顯示載入狀態
+        aiDescSelectedBtn.textContent = `正在生成 ${selectedProducts.length} 個描述...`;
+        aiDescSelectedBtn.disabled = true;
+        
+        // 批量生成描述
+        let completed = 0;
+        selectedProducts.forEach((product, index) => {
+          setTimeout(() => {
+            const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
+            product.desc = aiDescription;
+            completed++;
+            
+            // 立即更新該行的顯示
+            const textarea = document.querySelector(`textarea[data-id="${product.id}"]`);
+            if (textarea) {
+              textarea.value = aiDescription;
+              textarea.style.backgroundColor = '#f0f9ff';
+              setTimeout(() => {
+                textarea.style.backgroundColor = '';
+              }, 1000);
+            }
+            
+            if (completed === selectedProducts.length) {
+              // 全部完成
+              aiDescSelectedBtn.textContent = '為選中商品生成';
+              aiDescSelectedBtn.disabled = false;
+              showToast(`成功為 ${selectedProducts.length} 個選中商品生成描述！`);
+              
+              // 重新渲染DM預覽
+              renderDM();
+            }
+          }, index * 200); // 每個商品間隔200ms，避免太快
+        });
+      });
+    }
     
-    els.imgInput && els.imgInput.addEventListener('change', async (e) => {
+    els.imgInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       try {
@@ -2059,7 +1412,7 @@
       } catch(err){ console.error(err); }
     });
 
-    els.form && els.form.addEventListener('submit', (e) => {
+    els.form.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(els.form);
       const product = {
@@ -2071,13 +1424,12 @@
         imageDataUrl: pendingImage || '',
       };
       if (!product.name || !product.price) { alert('請填商品名與售價'); return; }
-      product.updatedAt = new Date().toISOString();
       state.products.unshift(product);
       pendingImage = null; els.imgName.textContent = '尚未選擇'; els.form.reset();
       renderTable(); renderDM();
     });
 
-    els.csvInput && els.csvInput.addEventListener('change', (e) => {
+    els.csvInput.addEventListener('change', (e) => {
       const file = e.target.files[0]; if (!file) return;
       Papa.parse(file, {
         header: true, skipEmptyLines: true,
@@ -2093,7 +1445,6 @@
             }
             state.products.push({ id: uid(), name: (row.name||'').toString(), price: Number(row.price||0), originalPrice: row.originalPrice? Number(row.originalPrice):'', desc: (row.desc||'').toString(), imageDataUrl });
           }
-          saveProducts(state.products); // 自動儲存
           renderTable(); renderDM();
         }
       });
@@ -2111,23 +1462,7 @@
 
     // ===== 商品表格 =====
     function renderTable(){
-      console.log('renderTable 被調用，商品數量:', state.products.length);
-      console.log('renderTable - 當前商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
       els.tbody.innerHTML = '';
-      
-      // 如果沒有商品，顯示提示信息
-      if (state.products.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td colspan="7" class="p-8 text-center text-gray-500">
-            <div class="text-lg mb-2">📦</div>
-            <div>目前沒有商品</div>
-            <div class="text-sm mt-1">點擊「新增商品」按鈕開始添加商品</div>
-          </td>`;
-        els.tbody.appendChild(tr);
-        return;
-      }
-      
       for (const p of state.products) {
         const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-slate-50';
         tr.innerHTML = `
@@ -2143,11 +1478,8 @@
           <td class="p-2 align-top">
             <div class="flex gap-1">
               <textarea class="flex-1 border rounded-lg p-1" rows="2" data-edit="desc" data-id="${p.id}">${escapeHtml(p.desc)}</textarea>
-              <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ai-desc-single" data-id="${p.id}" title="AI生成描述">AI</button>
+              <button type="button" class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ai-desc-single" data-id="${p.id}" title="AI生成描述">AI</button>
             </div>
-          </td>
-          <td class="p-2 align-top">
-            <button type="button" class="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors delete-product" data-id="${p.id}" title="刪除商品">刪除</button>
           </td>`;
         els.tbody.appendChild(tr);
       }
@@ -2170,7 +1502,6 @@
             const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
             textarea.value = aiDescription;
             product.desc = aiDescription;
-            saveProducts(state.products); // 自動儲存
             
             // 恢復按鈕狀態
             e.target.textContent = 'AI';
@@ -2182,7 +1513,7 @@
               textarea.style.backgroundColor = '';
             }, 1000);
             
-            (window.toast||alert)('AI描述生成完成！');
+            showToast('AI描述生成完成！');
           }, 600);
         });
       });
@@ -2198,28 +1529,6 @@
           renderDM();
         });
       });
-      
-      // 刪除商品按鈕
-      els.tbody.querySelectorAll('.delete-product').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const productId = e.target.dataset.id;
-          const product = state.products.find(p => p.id === productId);
-          if (!product) return;
-          
-          if (confirm(`確定要刪除商品「${product.name}」嗎？`)) {
-            // 從商品列表中移除
-            state.products = state.products.filter(p => p.id !== productId);
-            // 從選擇中移除
-            state.selection.delete(productId);
-            // 自動儲存
-            saveProducts(state.products);
-            // 重新渲染表格和DM
-            renderTable();
-            renderDM();
-            (window.toast||alert)('商品已刪除');
-          }
-        });
-      });
 
       // 點縮圖重新上傳
       els.tbody.querySelectorAll('[data-reupload]').forEach(box=>{
@@ -2229,7 +1538,7 @@
           input.onchange = async (ev)=>{
             const file = ev.target.files[0]; if (!file) return;
             const url = await fileToDataUrl(file);
-            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; p.updatedAt = new Date().toISOString(); saveProducts(state.products); renderTable(); renderDM();
+            const p = state.products.find(x=>x.id===id); if (!p) return; p.imageDataUrl = url; renderTable(); renderDM();
           };
           input.click();
         });
@@ -2242,8 +1551,6 @@
           const p = state.products.find(x=>x.id===id); if (!p) return;
           if (key==='price' || key==='originalPrice') p[key] = e.target.value===''? '' : Number(e.target.value);
           else p[key] = e.target.value;
-          p.updatedAt = new Date().toISOString();
-          saveProducts(state.products); // 自動儲存
           renderDM();
         });
       });
@@ -2257,57 +1564,16 @@
           renderTable(); renderDM();
         });
       }
-
     }
 
     // ===== 模板渲染 =====
-    els.templateSelect.addEventListener('change', ()=>{ 
-      state.template = els.templateSelect.value; 
-      updateTemplateSettings();
-      renderDM(); 
-    });
-    
-    // 更新模板專用設定顯示
-    function updateTemplateSettings() {
-      const template = state.template;
-      
-      // 隱藏所有專用設定
-      document.getElementById('single-settings').classList.add('hidden');
-      document.getElementById('singlefull-settings').classList.add('hidden');
-      document.getElementById('list-settings').classList.add('hidden');
-      document.getElementById('grid9-settings').classList.add('hidden');
-      
-      // 顯示對應的專用設定
-      if (template === 'single') {
-        document.getElementById('single-settings').classList.remove('hidden');
-      } else if (template === 'singleFull') {
-        document.getElementById('singlefull-settings').classList.remove('hidden');
-      } else if (template === 'list') {
-        document.getElementById('list-settings').classList.remove('hidden');
-      } else if (template === 'grid9') {
-        document.getElementById('grid9-settings').classList.remove('hidden');
-      }
-    }
-    els.fitSelect && els.fitSelect.addEventListener('change', ()=>{ state.imgFit = els.fitSelect.value; renderDM(); });
-    els.posSelect && els.posSelect.addEventListener('change', ()=>{ state.imgPos = els.posSelect.value; renderDM(); });
-    els.ratioSelect && els.ratioSelect.addEventListener('change', ()=>{ state.imgRatio = els.ratioSelect.value; renderDM(); });
-    els.gridCardH && els.gridCardH.addEventListener('change', ()=>{ state.gridCardH = Number(els.gridCardH.value); renderDM(); });
-    els.gridFill && els.gridFill.addEventListener('change', ()=>{ state.gridFill = els.gridFill.checked; renderDM(); });
-    els.gridImgFrac && els.gridImgFrac.addEventListener('change', ()=>{ state.gridImgFrac = Number(els.gridImgFrac.value); renderDM(); });
-    
-    // 新增的模板專用設定事件監聽器
-    document.getElementById('single-img-ratio')?.addEventListener('change', ()=>{ state.singleImgRatio = document.getElementById('single-img-ratio').value; renderDM(); });
-    document.getElementById('single-card-ratio')?.addEventListener('change', ()=>{ state.singleCardRatio = Number(document.getElementById('single-card-ratio').value); renderDM(); });
-    document.getElementById('single-text-ratio')?.addEventListener('change', ()=>{ state.singleTextRatio = Number(document.getElementById('single-text-ratio').value); renderDM(); });
-    
-    document.getElementById('singlefull-img-ratio')?.addEventListener('change', ()=>{ state.singlefullImgRatio = document.getElementById('singlefull-img-ratio').value; renderDM(); });
-    document.getElementById('singlefull-font-ratio')?.addEventListener('change', ()=>{ state.singlefullFontRatio = Number(document.getElementById('singlefull-font-ratio').value); renderDM(); });
-    
-    document.getElementById('list-img-ratio')?.addEventListener('change', ()=>{ state.listImgRatio = document.getElementById('list-img-ratio').value; renderDM(); });
-    document.getElementById('list-card-ratio')?.addEventListener('change', ()=>{ state.listCardRatio = Number(document.getElementById('list-card-ratio').value); renderDM(); });
-    document.getElementById('list-text-ratio')?.addEventListener('change', ()=>{ state.listTextRatio = Number(document.getElementById('list-text-ratio').value); renderDM(); });
-    
-    document.getElementById('grid-text-ratio')?.addEventListener('change', ()=>{ state.gridTextRatio = Number(document.getElementById('grid-text-ratio').value); renderDM(); });
+    els.templateSelect.addEventListener('change', ()=>{ state.template = els.templateSelect.value; renderDM(); });
+    els.fitSelect.addEventListener('change', ()=>{ state.imgFit = els.fitSelect.value; renderDM(); });
+    els.posSelect.addEventListener('change', ()=>{ state.imgPos = els.posSelect.value; renderDM(); });
+    els.ratioSelect.addEventListener('change', ()=>{ state.imgRatio = els.ratioSelect.value; renderDM(); });
+    els.gridCardH.addEventListener('change', ()=>{ state.gridCardH = Number(els.gridCardH.value); renderDM(); });
+    els.gridFill.addEventListener('change', ()=>{ state.gridFill = els.gridFill.checked; renderDM(); });
+    els.gridImgFrac.addEventListener('change', ()=>{ state.gridImgFrac = Number(els.gridImgFrac.value); renderDM(); });
 
     function renderDM(){
       const wrap = els.dmCanvas; wrap.innerHTML='';
@@ -2342,13 +1608,9 @@
 
     function getActiveShop(){ return state.selectedShopId ? findShopById(state.selectedShopId) : null; }
     function getActiveMeta(){
-      // 統一的預設值，確保未選擇店家時與選擇店家後的預設值一致
-      const defaultMeta = { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
-      
-      if (!hasScopeReady()) return defaultMeta;
-      
+      if (!hasScopeReady()) return { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
       const c = findCampById(state.selectedShopId, state.selectedCampaignId);
-      const meta = c?.meta || defaultMeta;
+      const meta = c?.meta || { showShopName:true, showCampaignName:true, showContact:false, showNotes:false, notes:'', showBadge:false, badgeText:'限時特價', qrDataUrl:'', showLogo:false, showQR:true, borderStyle:'none', borderColor:'#e2e8f0', backgroundColor:'#ffffff' };
       return meta;
     }
 
@@ -2478,14 +1740,12 @@
             <div class="text-3xl font-extrabold mb-3">${priceTag(p.price)} ${p.originalPrice? `<span class='text-lg text-slate-400 line-through align-middle ml-2'>${priceTag(p.originalPrice)}</span>`:''}</div>
             <div class="text-lg text-slate-600 mb-3 flex-1" style="line-height: 1.3;">${escapeHtml(p.desc||'')}</div>
             <div class="text-sm text-slate-500 mb-4">* 價格變動以當下標示為準</div>
-            <div class="mt-4">${renderNotesBlock(meta,'light', shop,'mt-2')}</div>
+              ${renderSingleSupplement(meta, shop)}
         </div>
         </div>
         <div class="h-16 bg-slate-900/95 text-white flex items-center justify-center text-sm tracking-widest px-4">
           ${renderFooterInfo(meta, shop)}
-        </div>
-        ${createWatermark()}
-      `;
+        </div>`;
       root.appendChild(node);
     }
 
@@ -2499,7 +1759,7 @@
         <div class="absolute inset-0">${p.imageDataUrl?`<div class='w-full h-full' style="background-image:url('${p.imageDataUrl}');background-size:${bgSize};background-position:${bgPos};background-repeat:no-repeat;"></div>`:`<div class='w-full h-full bg-gradient-to-br from-slate-200 to-slate-100'></div>`}</div>
         <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"></div>
         <div class="absolute inset-x-0 top-0 h-20 px-10 flex items-center justify-between text-white relative">
-          <div class="text-3xl font-extrabold tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
+          <div class="text-3xl font-extrabold tracking-wide drop-shadow">${meta.showShopName? `<span class='mr-3 inline-flex items-center gap-2'><span class='inline-block w-2.5 h-2.5 rounded-full' style='background:${brand}'></span>${escapeHtml(shop?.name||'')}</span>`:''}</div>
           ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-white/90 pointer-events-none drop-shadow'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
           <div class="flex items-center gap-2">
             ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white/90'/></div>`:''}
@@ -2519,9 +1779,7 @@
           </div>
           <div class="flex-1">${renderNotesBlock(meta,'glass', shop)}</div>
           <div class="mt-4 h-14 bg-white/92 rounded-2xl px-6 flex items-center justify-center text-slate-900 text-sm tracking-widest shadow">${renderFooterInfo(meta, shop)}</div>
-        </div>
-        ${createWatermark()}
-      `;
+        </div>`;
       root.appendChild(node);
     }
 
@@ -2546,7 +1804,7 @@
           ${meta.showCampaignName? `<div class='absolute left-1/2 -translate-x-1/2 text-xl font-semibold text-slate-800 pointer-events-none'>${escapeHtml(findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'')}</div>`:''}
           <div class="flex items-center gap-2">
             ${meta.showBadge? `<div class="px-3 py-1 rounded-full bg-rose-600 text-white text-sm">${escapeHtml(meta.badgeText||'限時特價')}</div>`:''}
-            ${meta.showLogo && shop?.logoDataUrl? `<img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white'/>`:''}
+            ${meta.showLogo && shop?.logoDataUrl? `<div class='flex flex-col items-end gap-1'><img src='${shop.logoDataUrl}' class='w-14 h-14 object-contain rounded-md border bg-white'/></div>`:''}
         </div>
         </div>
         <div class="grid grid-cols-3 gap-6 px-10 pb-6 place-content-start" style="min-height:${perCardH*3 + rowGaps}px"></div>
@@ -2556,14 +1814,12 @@
             <div class="col-span-4">${meta.showNotes && (meta.notes||'').trim()!=='' ? `<div class='bg-white rounded-2xl px-6 py-3 text-sm text-slate-800 shadow'>${escapeHtml(meta.notes)}</div>`:''}</div>
             <div class="col-span-2 flex justify-end">${(function(){ 
               const hasQR = !!(meta.qrDataUrl); 
-              const showQR = meta.showQR !== false;
-              return hasQR && showQR ? `<div class='bg-white rounded-2xl shadow p-4'><img src='${meta.qrDataUrl}' class='w-20 h-20 object-contain rounded-lg border'/></div>` : ''; 
+              const showQR = meta.showQR !== false; // 簡化條件，預設顯示
+              return hasQR && showQR ? `<img src='${meta.qrDataUrl}' class='w-24 h-24 object-contain rounded-lg border'/>` : ''; 
             })()}</div>
           </div>
         </div>
-        <div class="h-16 bg-slate-900 text-white flex items-center justify-center text-sm tracking-widest px-4">${renderFooterInfo(meta, shop)}</div>
-        ${createWatermark()}
-      `;
+        <div class="h-16 bg-slate-900 text-white flex items-center justify-center text-sm tracking-widest px-4">${renderFooterInfo(meta, shop)}</div>`;
       const grid = node.children[1];
       const a = arr.slice(0,9); if (state.gridFill) { while (a.length<9) a.push(null); }
       for (const p of a){
@@ -2575,11 +1831,11 @@
           card.innerHTML = `
             <div class="flex-none bg-slate-100 overflow-hidden high-res-img" style="height:${imgH}px">${productImageDom(p, true)}</div>
             <div class="p-3 flex-1 flex flex-col" style="height:${textH}px;">
-              <div class="text-lg font-bold mb-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
-              <div class="text-base text-slate-600 mb-2 flex-1" style="line-height: 1.2;">${escapeHtml(p.desc||'')}</div>
+              <div class="text-base font-bold mb-1" style="line-height: 1.1;">${escapeHtml(p.name)}</div>
+              <div class="text-sm text-slate-600 mb-2 flex-1" style="line-height: 1.2;">${escapeHtml(p.desc||'')}</div>
               <div class="flex items-baseline gap-2 mt-auto">
-                <div class="text-2xl font-extrabold">${priceTag(p.price)}</div>
-                ${p.originalPrice? `<div class='text-base text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
+                <div class="text-xl font-extrabold">${priceTag(p.price)}</div>
+                ${p.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
               </div>
             </div>`;
         }
@@ -2602,17 +1858,15 @@
         </div>
         <div class="bg-white rounded-2xl shadow divide-y" style="${getBorderStyle(meta)}${getBackgroundStyle(meta)}"></div>
         <div class="mt-4">${renderNotesBlock(meta,'light', shop,'mt-2')}</div>
-        <div class="mt-auto text-xs text-slate-500">${renderFooterInfo(meta, shop)}</div>
-        ${createWatermark()}
-      `;
+        <div class="mt-auto text-xs text-slate-500">${renderFooterInfo(meta, shop)}</div>`;
       const list = node.children[1];
       const max = 12; const items = arr.slice(0, max);
       for (const p of items){
         const row = document.createElement('div'); row.className='grid grid-cols-12 items-start gap-2 p-4';
         row.innerHTML = `
           <div class="col-span-2"><div class='rounded-xl overflow-hidden high-res-img' style='width:4.5rem; aspect-ratio:${state.imgRatio}; ${getBorderStyle(meta)}${getBackgroundStyle(meta)}'>${productImageDom(p, true)}</div></div>
-          <div class="col-span-5 text-xl font-semibold" style="line-height: 1.2;">${escapeHtml(p?.name||'商品')}</div>
-          <div class="col-span-3 text-base text-slate-600" style="line-height: 1.3;">${escapeHtml(p?.desc||'')}</div>
+          <div class="col-span-5 text-lg font-semibold" style="line-height: 1.2;">${escapeHtml(p?.name||'商品')}</div>
+          <div class="col-span-3 text-sm text-slate-600" style="line-height: 1.3;">${escapeHtml(p?.desc||'')}</div>
           <div class="col-span-2 text-right flex flex-col justify-start">
             <div class="text-3xl font-extrabold">${priceTag(p?.price||0)}</div>
             ${p?.originalPrice? `<div class='text-sm text-slate-400 line-through'>${priceTag(p.originalPrice)}</div>`:''}
@@ -2623,8 +1877,7 @@
     }
 
     function renderFooterInfo(meta, shop){
-      const shopName = shop?.name || 'yourshop';
-      return `掃描 QR 立刻下單｜@${shopName}`;
+      return '掃描 QR 立刻下單｜@yourshop';
     }
 
     function buildContactLines(shop){
@@ -2651,24 +1904,10 @@
       const showContact = !!(meta.showContact && contactLines.length);
       const hasQR = !!(meta.qrDataUrl||'');
       const showQR = meta.showQR !== false; // 簡化條件，預設顯示
-      const shouldShowQR = hasQR && showQR;
-      if (!hasNotes && !showContact && !shouldShowQR) return '';
+      if (!hasNotes && !showContact && !(hasQR && showQR)) return '';
       const note = hasNotes? escapeHtml(meta.notes||'') : '';
       const contactDom = showContact? `<div class='text-xs text-slate-600 mt-2 space-y-1'>${contactLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>` : '';
-      
-      // 根據模板調整QR卡片樣式
-      const isSingle = state.template === 'single';
-      let qr = '';
-      if (shouldShowQR) {
-        if (isSingle) {
-          // 單品左右版：QR卡片適應QR大小
-          qr = `<div class='bg-white rounded-2xl shadow p-2 ml-4'><img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain rounded-lg'/></div>`;
-        } else {
-          // 其他模板：保持原樣
-          qr = `<img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain ml-4 rounded-lg border'/>`;
-        }
-      }
-      
+      const qr = (hasQR && showQR)? `<img src='${meta.qrDataUrl}' alt='QR' class='w-24 h-24 object-contain ml-4 rounded-lg border'/>` : '';
       const base = theme==='glass' ? 'bg-white/40 backdrop-blur-sm text-slate-900' : 'bg-white text-slate-800';
       const extra = extraClass? ` ${extraClass}` : '';
       return `<div class='${base} rounded-2xl px-6 py-3 flex items-center justify-between shadow${extra}'>
@@ -2677,16 +1916,20 @@
       </div>`;
     }
 
-    // 單品：右側欄補充區（上：聯絡；中：說明）
+    // 單品：右側欄補充區（上：聯絡；中：說明；右：QR）
     function renderSingleSupplement(meta, shop){
       const hasNotes = !!(meta.showNotes && (meta.notes||'').trim()!=='');
       const contactLines = meta.showContact ? buildContactLines(shop) : [];
       const hasContact = contactLines.length>0;
-      if (!hasNotes && !hasContact) return '';
+      const hasQR = !!(meta.qrDataUrl||'');
+      const showQR = meta.showQR !== false; // 簡化條件，預設顯示
+      if (!hasNotes && !hasContact && !(hasQR && showQR)) return '';
       const contactDom = hasContact? `<div class='text-xs text-slate-600 space-y-1'>${contactLines.map(l=>`<div>${escapeHtml(l)}</div>`).join('')}</div>`:'';
       const notesDom = hasNotes? `<div class='mt-2 text-sm text-slate-700'>${escapeHtml(meta.notes||'')}</div>`:'';
-      return `<div class='mt-4'>
-        ${contactDom}${!hasNotes && hasContact? '': notesDom}
+      const qrDom = (hasQR && showQR)? `<img src='${meta.qrDataUrl}' alt='QR' class='w-28 h-28 object-contain rounded-lg border'/>`:'';
+      return `<div class='mt-4 grid grid-cols-3 gap-4 items-start'>
+        <div class='col-span-2'>${contactDom}${!hasNotes && hasContact? '': notesDom}</div>
+        <div class='col-span-1 flex justify-end'>${qrDom}</div>
       </div>`;
     }
 
@@ -2742,27 +1985,6 @@
       incrementUsage();
       
       try {
-        // 檢查是否從 file:// 協議載入
-        if (window.location.protocol === 'file:') {
-          const useServer = confirm(
-            '檢測到您正在使用本地文件模式。\n\n' +
-            '為了避免跨域限制，建議使用本地HTTP服務器。\n\n' +
-            '點擊「確定」：嘗試使用本地服務器\n' +
-            '點擊「取消」：繼續使用當前模式（可能失敗）'
-          );
-          
-          if (useServer) {
-            startLocalServer();
-            return;
-          }
-        }
-        
-        // 檢查必要的庫是否載入
-        if (typeof html2canvas === 'undefined') {
-          throw new Error('html2canvas 庫未載入');
-        }
-        
-        console.log('html2canvas 庫已載入:', typeof html2canvas);
         const shop = findShopById(state.selectedShopId)?.name||'shop';
         const camp = findCampById(state.selectedShopId, state.selectedCampaignId)?.name||'campaign';
         const pageNodes = els.dmCanvas.querySelectorAll('.dm-page');
@@ -2770,35 +1992,26 @@
         const pageIndices = getDownloadPageRange();
         
         console.log('Starting PNG download, pages:', pageIndices);
-        console.log('DM Canvas element:', els.dmCanvas);
-        console.log('Page nodes found:', pageNodes.length);
         
         // 移除縮放
         const originalTransform = els.scaleWrap.style.transform;
         els.scaleWrap.style.transform = 'scale(1)';
         await new Promise(r => setTimeout(r, 100));
         
-        console.log('Scale removed, proceeding with canvas generation...');
-        
         // 如果只有一頁，直接下載
         if (pageIndices.length === 1) {
           const page = allPages[pageIndices[0]];
-          console.log('Processing single page:', page);
-          
           const canvas = await html2canvas(page, { 
             backgroundColor: '#ffffff', 
             scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
             useCORS: true,
-            allowTaint: true, // 恢復為 true，保持原本的兼容性
-            logging: false // 關閉日誌避免干擾
+            allowTaint: true,
+            logging: false
           });
-          
-          console.log('Canvas created successfully:', canvas.width, 'x', canvas.height);
           
           const a = document.createElement('a'); 
           a.href = canvas.toDataURL('image/png', 1.0); 
           a.download = `${shop}-${camp}-${Date.now()}-p${pageIndices[0]+1}.png`; 
-          console.log('Download link created, triggering download...');
           a.click();
         } else {
           // 多頁下載，創建ZIP檔案
@@ -2811,7 +2024,7 @@
                 backgroundColor: '#ffffff', 
                 scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
                 useCORS: true,
-                allowTaint: true, // 恢復為 true，保持原本的兼容性
+                allowTaint: true,
                 logging: false
               });
               
@@ -2835,7 +2048,7 @@
                 backgroundColor: '#ffffff', 
                 scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
                 useCORS: true,
-                allowTaint: true, // 恢復為 true，保持原本的兼容性
+                allowTaint: true,
                 logging: false
               });
               
@@ -2858,8 +2071,7 @@
         console.log('PNG download completed');
       } catch (error) {
         console.error('PNG download error:', error);
-        console.error('Error stack:', error.stack);
-        alert('下載失敗：' + error.message + '\n\n請檢查瀏覽器控制台獲取詳細錯誤信息');
+        alert('下載失敗：' + error.message);
       }
     });
 
@@ -2903,10 +2115,8 @@
             backgroundColor: '#ffffff', 
             scale: 4, // 提高解析度到4倍，特別針對九宮格和清單的小圖片
             useCORS: true,
-            allowTaint: false, // 改為 false 避免跨域問題
-            logging: false,
-            foreignObjectRendering: false, // 禁用外部對象渲染
-            removeContainer: true // 移除容器避免樣式衝突
+            allowTaint: true,
+            logging: false
           });
           
           console.log('PDF Canvas created, size:', canvas.width, 'x', canvas.height);
@@ -2949,6 +2159,7 @@
     els.zoomRange.addEventListener('input', (e)=>{ state.preview.fit=false; state.preview.scale = Number(e.target.value); els.zoomVal.textContent = Math.round(state.preview.scale*100)+'%'; applyScale(); });
 
     // ===== 預設樣式（帳號儲存） =====
+    const PRESET_KEY_PREFIX = 'dm-presets-v4:'; // 每個帳號一份（只讀用）
 
     function defaultPresets(){
       return [
@@ -2962,42 +2173,21 @@
     function storageKeyV4(){ return state.user ? PRESET_KEY_PREFIX + state.user.id : null; }
 
     function loadPresets(){
-      // 未登入：僅顯示內建預設
-      if (!state.user) return defaultPresets();
-      
-      // 如果有選擇店家和方案，載入該方案的預設樣式
-      if (state.selectedShopId && state.selectedCampaignId) {
+      // 未登入或尚未選擇範圍：僅顯示內建預設
+      if (!state.user || !hasScopeReady()) return defaultPresets();
       const keyV5 = presetsV5Key(state.selectedShopId, state.selectedCampaignId);
       try {
         const raw = keyV5 ? localStorage.getItem(keyV5) : null;
         const arr = raw ? JSON.parse(raw) : [];
         if (Array.isArray(arr) && arr.length>0) return arr;
       } catch(err){ console.warn('讀取 v5 預設失敗', err); }
-      }
-      
-      // 嘗試載入通用保存的預設樣式
-      const keyV4 = storageKeyV4();
-      if (keyV4) {
-        try {
-          const raw = localStorage.getItem(keyV4);
-          const arr = raw ? JSON.parse(raw) : [];
-          if (Array.isArray(arr) && arr.length>0) return arr;
-        } catch(err){ console.warn('讀取 v4 預設失敗', err); }
-      }
-      
-      // fallback：顯示內建預設
+      // fallback：顯示內建預設（也可選擇讀 v4，但不寫回）
       return defaultPresets();
     }
 
     function savePresets(list){
       if (!state.user){ alert('請先登入帳號才能儲存樣式'); return false; }
-      if (!state.selectedShopId || !state.selectedCampaignId){ 
-        // 如果沒有選擇店家和方案，使用通用key保存
-        const key = storageKeyV4();
-        if (!key) return false;
-        try { localStorage.setItem(key, JSON.stringify(list)); return true; }
-        catch(err){ console.error('寫入失敗', err); alert('儲存失敗：瀏覽器可能封鎖了儲存空間'); return false; }
-      }
+      if (!hasScopeReady()){ return false; }
       const key = presetsV5Key(state.selectedShopId, state.selectedCampaignId);
       try { localStorage.setItem(key, JSON.stringify(list)); return true; }
       catch(err){ console.error('寫入失敗', err); alert('儲存失敗：瀏覽器可能封鎖了儲存空間'); return false; }
@@ -3034,101 +2224,13 @@
     }
 
     function currentSettings(){
-      const meta = getActiveMeta();
       return {
-        // 模板與圖片樣式設定
-        template: state.template, 
-        imgFit: state.imgFit, 
-        imgPos: state.imgPos, 
-        imgRatio: state.imgRatio,
-        gridCardH: state.gridCardH, 
-        gridFill: state.gridFill, 
-        gridImgFrac: state.gridImgFrac,
-        gridTextRatio: state.gridTextRatio,
-        // 單品左右版設定
-        singleImgRatio: state.singleImgRatio,
-        singleCardRatio: state.singleCardRatio,
-        singleTextRatio: state.singleTextRatio,
-        // 單品滿版設定
-        singlefullImgRatio: state.singlefullImgRatio,
-        singlefullFontRatio: state.singlefullFontRatio,
-        // 清單設定
-        listImgRatio: state.listImgRatio,
-        listCardRatio: state.listCardRatio,
-        listTextRatio: state.listTextRatio,
-        // DM顯示項目設定
-        showShopName: meta.showShopName,
-        showCampaignName: meta.showCampaignName,
-        showContact: meta.showContact,
-        showNotes: meta.showNotes,
-        notes: meta.notes,
-        showBadge: meta.showBadge,
-        badgeText: meta.badgeText,
-        showLogo: meta.showLogo,
-        showQR: meta.showQR,
-        borderStyle: meta.borderStyle,
-        borderColor: meta.borderColor,
-        backgroundColor: meta.backgroundColor,
+        template: state.template, imgFit: state.imgFit, imgPos: state.imgPos, imgRatio: state.imgRatio,
+        gridCardH: state.gridCardH, gridFill: state.gridFill, gridImgFrac: state.gridImgFrac,
       };
     }
 
-    function applySettings(s){ 
-      if (!s) return; 
-      
-      // 套用模板與圖片樣式設定
-      state.template = s.template ?? state.template; 
-      els.templateSelect && (els.templateSelect.value = state.template); 
-      state.imgFit = s.imgFit ?? state.imgFit; 
-      els.fitSelect && (els.fitSelect.value = state.imgFit); 
-      state.imgPos = s.imgPos ?? state.imgPos; 
-      els.posSelect && (els.posSelect.value = state.imgPos); 
-      state.imgRatio = s.imgRatio ?? state.imgRatio; 
-      els.ratioSelect && (els.ratioSelect.value = state.imgRatio); 
-      state.gridCardH = s.gridCardH ?? state.gridCardH; 
-      els.gridCardH && (els.gridCardH.value = String(state.gridCardH)); 
-      state.gridFill = s.gridFill ?? state.gridFill; 
-      els.gridFill && (els.gridFill.checked = !!state.gridFill); 
-      state.gridImgFrac = s.gridImgFrac ?? state.gridImgFrac; 
-      els.gridImgFrac && (els.gridImgFrac.value = String(state.gridImgFrac));
-      
-      // 套用新增的模板專用設定
-      state.gridTextRatio = s.gridTextRatio ?? state.gridTextRatio;
-      state.singleImgRatio = s.singleImgRatio ?? state.singleImgRatio;
-      state.singleCardRatio = s.singleCardRatio ?? state.singleCardRatio;
-      state.singleTextRatio = s.singleTextRatio ?? state.singleTextRatio;
-      state.singlefullImgRatio = s.singlefullImgRatio ?? state.singlefullImgRatio;
-      state.singlefullFontRatio = s.singlefullFontRatio ?? state.singlefullFontRatio;
-      state.listImgRatio = s.listImgRatio ?? state.listImgRatio;
-      state.listCardRatio = s.listCardRatio ?? state.listCardRatio;
-      state.listTextRatio = s.listTextRatio ?? state.listTextRatio;
-      
-      // 套用DM顯示項目設定到當前方案
-      if (state.selectedShopId && state.selectedCampaignId) {
-        const c = findCampById(state.selectedShopId, state.selectedCampaignId);
-        if (c) {
-          c.meta = {
-            ...c.meta,
-            showShopName: s.showShopName ?? c.meta.showShopName,
-            showCampaignName: s.showCampaignName ?? c.meta.showCampaignName,
-            showContact: s.showContact ?? c.meta.showContact,
-            showNotes: s.showNotes ?? c.meta.showNotes,
-            notes: s.notes ?? c.meta.notes,
-            showBadge: s.showBadge ?? c.meta.showBadge,
-            badgeText: s.badgeText ?? c.meta.badgeText,
-            showLogo: s.showLogo ?? c.meta.showLogo,
-            showQR: s.showQR ?? c.meta.showQR,
-            borderStyle: s.borderStyle ?? c.meta.borderStyle,
-            borderColor: s.borderColor ?? c.meta.borderColor,
-            backgroundColor: s.backgroundColor ?? c.meta.backgroundColor,
-          };
-          saveCamps(state.selectedShopId, loadCamps(state.selectedShopId));
-          loadDisplayOptionsFromMeta();
-        }
-      }
-      
-      updateTemplateSettings();
-      renderDM(); 
-    }
+    function applySettings(s){ if (!s) return; state.template=s.template??state.template; els.templateSelect.value=state.template; state.imgFit=s.imgFit??state.imgFit; els.fitSelect.value=state.imgFit; state.imgPos=s.imgPos??state.imgPos; els.posSelect.value=state.imgPos; state.imgRatio=s.imgRatio??state.imgRatio; els.ratioSelect.value=state.imgRatio; state.gridCardH=s.gridCardH??state.gridCardH; els.gridCardH.value=String(state.gridCardH); state.gridFill=s.gridFill??state.gridFill; els.gridFill.checked=!!state.gridFill; state.gridImgFrac=s.gridImgFrac??state.gridImgFrac; els.gridImgFrac.value=String(state.gridImgFrac); renderDM(); }
 
     function sortPresetsForView(list){ return list.slice().sort((a,b)=> (b.pinned?1:0)-(a.pinned?1:0)); }
 
@@ -3194,7 +2296,7 @@
     function reloadPresets(){ presets = loadPresets(); renderPresetButtons(); updatePresetControls(); }
 
     function updatePresetControls(){
-      const disabled = !state.user;
+      const disabled = !state.user || !hasScopeReady();
       els.presetAddBtn.disabled = disabled; els.presetAddName.disabled = disabled;
       els.presetAddBtn.classList.toggle('opacity-50', disabled);
       els.presetAddBtn.classList.toggle('cursor-not-allowed', disabled);
@@ -3219,7 +2321,7 @@
     }
 
     function persistMeta(updater){
-      if (!state.selectedShopId || !state.selectedCampaignId) return;
+      if (!hasScopeReady()) return;
       const camps = loadCamps(state.selectedShopId);
       const idx = camps.findIndex(c=>c.id===state.selectedCampaignId);
       if (idx<0) return;
@@ -3258,21 +2360,7 @@
         const key = card.getAttribute('data-acc-key')||'';
         const title = card.querySelector('.acc-title'); if (!title) return;
         const content = Array.from(card.children).filter(n=> n!==title);
-        // 預設：shop-camp 展開；dm-settings 收納；其他依原本 aria-expanded 或已保存狀態
-        let expanded;
-        if (key === 'shop-camp') {
-          expanded = true;
-        } else if (key === 'dm-settings') {
-          expanded = false;
-        } else {
-          const saved = Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
-          if (saved === null || saved === undefined) {
-            const attr = title.getAttribute('aria-expanded');
-            expanded = attr ? (attr === 'true') : false;
-          } else {
-            expanded = !!saved;
-          }
-        }
+        const expanded = key==='shop-camp' ? true : !!map[key];
         title.setAttribute('aria-expanded', expanded?'true':'false');
         content.forEach(n=> n.style.display = expanded? '' : 'none');
         title.addEventListener('click', (ev)=>{
@@ -3289,19 +2377,6 @@
     function updateAccordionLock(){
       // 預覽區不收合；其他已由 initAccordion 控制
     }
-
-    // 補強：全域委派（不影響原邏輯）確保可展開/收納
-    document.addEventListener('click', (ev)=>{
-      const title = ev.target.closest('.acc-title');
-      if (!title) return;
-      const card = title.closest('.acc'); if (!card) return;
-      const content = Array.from(card.children).filter(n=> n!==title);
-      const isOpen = title.getAttribute('aria-expanded')==='true';
-      const nextOpen = !isOpen;
-      title.setAttribute('aria-expanded', nextOpen?'true':'false');
-      content.forEach(n=> n.style.display = nextOpen? '' : 'none');
-      try { const m = loadAcc(); const key = card.getAttribute('data-acc-key')||''; m[key]=nextOpen; saveAcc(m); } catch(e){}
-    });
 
     // ===== 自我測試 =====
     function runSelfTests(){
@@ -3389,17 +2464,11 @@
       log(state.template==='grid9', '預設模板為九宮格');
       // 商品庫表頭全選存在
       log(!!document.getElementById('select-all'), '商品庫有全選勾選');
-      // 分頁檢查（使用臨時測試資料，不影響實際商品）
+      // 分頁檢查
       const backupP = [...state.products];
-      const testProducts = [];
-      while(testProducts.length<11){ testProducts.push({ id: uid(), name:'測試品', price:1, originalPrice:'', desc:'', imageDataUrl:'' }); }
-      const originalSelection = new Set(state.selection);
-      state.selection = new Set(testProducts.map(p=>p.id));
-      state.template='grid9'; 
-      // 臨時替換商品進行測試
-      const originalProducts = state.products;
-      state.products = testProducts;
-      renderDM();
+      while(state.products.length<11){ state.products.push({ id: uid(), name:'測試品', price:1, originalPrice:'', desc:'', imageDataUrl:'' }); }
+      state.selection = new Set(state.products.map(p=>p.id));
+      state.template='grid9'; renderDM();
       log(els.dmCanvas.children.length>=2, '九宮格 >9 件會分頁');
       state.template='list'; renderDM(); log(els.dmCanvas.children.length>=1, '清單可渲染多頁');
       state.template='single'; renderDM(); log(els.dmCanvas.children.length>=1, '單品可分頁');
@@ -3408,465 +2477,27 @@
       // 徽章不重複
       state.template='single'; renderDM();
       const badgeCount = (els.dmCanvas.innerHTML.match(/限時特價/g)||[]).length; log(badgeCount<=1, '促銷徽章不重複');
-      // 還原原始狀態
-      state.products = originalProducts;
-      state.selection = originalSelection;
-      state.template='grid9'; renderDM();
+      // 還原
+      state.products = backupP; state.selection = new Set(); state.template='grid9'; renderDM();
     }
-
-    // 清理所有 demo 商品資料
-    function clearAllDemoProducts() {
-      console.log('清理所有 demo 商品資料...');
-      
-      // 清理所有可能的商品儲存鍵
-      const keys = Object.keys(localStorage);
-      const productKeys = keys.filter(key => key.startsWith('dm-products-v1:'));
-      
-      productKeys.forEach(key => {
-        try {
-          const raw = localStorage.getItem(key);
-          const products = JSON.parse(raw || '[]');
-          
-          // 檢查是否有 demo 商品或測試商品
-          const hasDemoProducts = products.some(p => 
-            p.name === '手作黑糖粉圓鮮奶 1L' || 
-            p.name === '低溫氣炸雞米花 500g' || 
-            p.name === '小農無毒牛番茄 2 斤' || 
-            p.name === '五花厚切燒肉片 600g' || 
-            p.name === '厚片蜂蜜吐司 6 片' ||
-            p.name === '測試品' ||
-            p.name === '453' ||
-            (p.name && p.name.length <= 3 && /^\d+$/.test(p.name)) // 清除純數字的商品名稱
-          );
-          
-          if (hasDemoProducts) {
-            console.log('清除包含 demo/測試商品的資料:', key);
-            localStorage.removeItem(key);
-          }
-        } catch (e) {
-          console.warn('清理商品資料時出錯:', key, e);
-        }
-      });
-      
-      // 清理舊的商品資料
-      const oldKeys = ['dm_products', 'products', 'demo_products'];
-      oldKeys.forEach(key => {
-        if (localStorage.getItem(key)) {
-          console.log('清除舊商品資料:', key);
-          localStorage.removeItem(key);
-        }
-      });
-    }
-
-    // 防止 Firebase 認證回調重複執行的標記
-    let authCallbackExecuted = false;
 
     // ===== 初始化 =====
-    function initApp() {
-      console.log('初始化開始，時間:', new Date().toISOString());
-      
-      // 每次初始化時重置標記
-      authCallbackExecuted = false;
-      console.log('authCallbackExecuted 已重置為 false');
-      
-      // 清理所有可能的 demo 商品資料
-      clearAllDemoProducts();
-      
-      try {
-        // 以 Firebase onAuthStateChanged 接管登入狀態
-        console.log('檢查 Firebase 認證系統:', {
-          firebaseAuth: !!window.firebaseAuth,
-          onAuth: !!(window.firebaseAuth && typeof window.firebaseAuth.onAuth === 'function')
-        });
-        
-        if (window.firebaseAuth && typeof window.firebaseAuth.onAuth === 'function'){
-          console.log('Firebase 認證系統可用，註冊認證回調');
-          window.firebaseAuth.onAuth((user)=>{
-            console.log('Firebase 認證回調觸發，user:', user?.email);
-            console.log('認證回調執行時間:', new Date().toISOString());
-            console.log('認證回調是否已執行過:', authCallbackExecuted);
-            
-            if (user){
-              const u = {
-                id: user.uid,
-                email: user.email||'',
-                name: user.displayName||user.email||'用戶',
-                isPremium: false,
-                maxUsage: 10,
-                usageCount: 0,
-            isAdmin: (user.email && getAdminEmails().has((user.email||'').toLowerCase()))
-              };
-              console.log('設置用戶狀態:', u);
-              state.user = u; setUser(u);
-            } else {
-              console.log('用戶未登入，清除狀態');
-              state.user = null; setUser(null);
-            }
+    (function init(){
+      // Demo 商品
+      const demo = [
+        { name:'手作黑糖粉圓鮮奶 1L', price:129, originalPrice:159, desc:'限量手炒黑糖，香濃Q彈。', imageDataUrl:'' },
+        { name:'低溫氣炸雞米花 500g', price:99, originalPrice:'', desc:'氣炸 8 分鐘即可上桌。', imageDataUrl:'' },
+        { name:'小農無毒牛番茄 2 斤', price:120, originalPrice:160, desc:'甜中帶酸，沙拉必備。', imageDataUrl:'' },
+        { name:'五花厚切燒肉片 600g', price:159, originalPrice:199, desc:'露營燒烤神隊友。', imageDataUrl:'' },
+        { name:'厚片蜂蜜吐司 6 片', price:65, originalPrice:'', desc:'早餐省時又好吃。', imageDataUrl:'' },
+      ];
+      for (const d of demo) state.products.push({ id: uid(), ...d });
 
-            // 使用者狀態就緒後，載入用戶商品資料並確保預設樣式與預覽顯示
-            try { 
-              console.log('Firebase 認證完成，載入用戶資料，user:', state.user?.id);
-              
-              // 將 Firebase 用戶資料同步到舊系統，讓後台能看到
-              if (state.user) {
-                const users = getAllUsers();
-                users[state.user.email] = {
-                  id: state.user.id,
-                  email: state.user.email,
-                  name: state.user.name,
-                  isPremium: state.user.isPremium || false,
-                  usageCount: state.user.usageCount || 0,
-                  maxUsage: state.user.maxUsage || 10,
-                  createdAt: new Date().toISOString()
-                };
-                saveUsers(users);
-                console.log('用戶資料已同步到後台系統');
-              }
-              
-              // 只在第一次執行時載入商品資料，避免覆蓋用戶正在編輯的商品
-              if (!authCallbackExecuted) {
-                authCallbackExecuted = true;
-                console.log('首次執行認證回調，載入商品資料');
-                console.log('authCallbackExecuted 設為 true');
-                // 載入用戶商品資料
-                const savedProducts = loadProducts();
-                console.log('從 localStorage 載入的商品:', savedProducts.map(p => ({ id: p.id, name: p.name })));
-                state.products = savedProducts; // 直接載入儲存的商品，如果沒有就是空陣列
-                console.log('載入的商品數量:', state.products.length);
-                console.log('載入後的商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
-                
-                // 驗證載入結果
-                if (savedProducts.length > 0) {
-                  console.log('✅ 商品載入成功，開始渲染');
-                } else {
-                  console.log('ℹ️ 無商品資料，顯示空白商品庫');
-                  // 檢查是否有其他用戶的商品資料
-                  const allKeys = Object.keys(localStorage);
-                  const productKeys = allKeys.filter(key => key.startsWith('dm-products-v1:'));
-                  console.log('所有商品儲存鍵:', productKeys);
-                  productKeys.forEach(key => {
-                    const raw = localStorage.getItem(key);
-                    const products = raw ? JSON.parse(raw) : [];
-                    console.log(`鍵 ${key} 的商品數量:`, products.length);
-                    if (products.length > 0) {
-                      console.log(`鍵 ${key} 的商品內容:`, products.map(p => ({ id: p.id, name: p.name })));
-                    }
-                  });
-                }
-                
-                // 確保渲染前 state.products 正確
-                console.log('渲染前最終檢查 - state.products 數量:', state.products.length);
-                console.log('渲染前最終檢查 - state.products 內容:', state.products.map(p => ({ id: p.id, name: p.name })));
-                
-                renderTable();
-                renderDM();
-                reloadPresets();
-              } else {
-                console.log('認證回調重複觸發，保持現有商品，不重新載入');
-                console.log('現有商品數量:', state.products.length);
-                console.log('現有商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
-                
-                // 如果現有商品為空，強制重新載入
-                if (state.products.length === 0) {
-                  console.log('⚠️ 現有商品為空，強制重新載入商品資料');
-                  const savedProducts = loadProducts();
-                  console.log('強制載入的商品:', savedProducts.map(p => ({ id: p.id, name: p.name })));
-                  state.products = savedProducts;
-                  console.log('強制載入後商品數量:', state.products.length);
-                }
-                
-                // 即使重複觸發，也要確保渲染正確
-                renderTable();
-                renderDM();
-              }
-              
-              // 定義並綁定新增商品函數（確保 state.user 已設置）
-              const createInlineNewRow = ()=>{
-                console.log('createInlineNewRow 被調用，當前用戶:', state.user?.id);
-                const exist = els.tbody.querySelector('tr[data-new="1"]');
-                if (exist){ exist.querySelector('input[placeholder="商品名稱"]').focus(); return; }
-                const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50'; tr.dataset.new='1';
-                const newId = uid();
-                tr.innerHTML = `
-                  <td class="p-2 align-top"></td>
-                  <td class="p-2 align-top">
-                    <div class="inline-block rounded-lg overflow-hidden cursor-pointer" id="newimg-${newId}" style="width:4rem;height:4rem;min-width:4rem;background:#f1f5f9;display:grid;place-items:center;">上傳</div>
-                  </td>
-                  <td class="p-2 align-top"><input class="w-48 border rounded-lg p-1" placeholder="商品名稱" id="newname-${newId}"></td>
-                  <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="售價" id="newprice-${newId}"></td>
-                  <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="原價(選填)" id="newori-${newId}"></td>
-                  <td class="p-2 align-top">
-                    <div class="flex gap-1">
-                      <textarea class="flex-1 border rounded-lg p-1" rows="2" placeholder="描述(選填)" id="newdesc-${newId}"></textarea>
-                      <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white" id="newai-${newId}">AI</button>
-                    </div>
-                  </td>
-                  <td class="p-2 align-top">
-                    <button type="button" class="px-3 py-1 text-xs rounded bg-emerald-600 text-white" id="newsave-${newId}">加入</button>
-                    <button type="button" class="px-3 py-1 text-xs rounded bg-slate-400 text-white" id="newcancel-${newId}">取消</button>
-                  </td>`;
-                els.tbody.prepend(tr);
-                tr.querySelector('input[placeholder="商品名稱"]').focus();
-                document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
-                  const input = document.createElement('input'); input.type='file'; input.accept='image/*';
-                  input.onchange = async (ev)=>{
-                    const file = ev.target.files[0]; if (!file) return;
-                    const url = await fileToDataUrl(file);
-                    const box = document.getElementById(`newimg-${newId}`);
-                    box.innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`; box.dataset.url = url;
-                  };
-                  input.click();
-                });
-                document.getElementById(`newai-${newId}`).addEventListener('click', ()=>{
-                  const name = (document.getElementById(`newname-${newId}`).value||'').trim();
-                  const price = Number(document.getElementById(`newprice-${newId}`).value||0);
-                  const ori = Number(document.getElementById(`newori-${newId}`).value||0) || '';
-                  const img = document.getElementById(`newimg-${newId}`).dataset.url||null;
-                  const ai = generateAIDescription(name, price, ori, img);
-                  document.getElementById(`newdesc-${newId}`).value = ai; (window.toast||alert)('已生成描述');
-                });
-                document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
-                document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
-                  console.log('儲存商品按鈕被點擊，當前用戶:', state.user?.id);
-                  const name = (document.getElementById(`newname-${newId}`).value||'').trim();
-                  const price = Number(document.getElementById(`newprice-${newId}`).value||0);
-                  const ori = document.getElementById(`newori-${newId}`).value;
-                  const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
-                  const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
-                  if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
-                  const newProduct = { id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl, updatedAt: new Date().toISOString() };
-                  state.products.unshift(newProduct);
-                  console.log('新增商品:', newProduct);
-                  console.log('準備儲存商品，用戶:', state.user?.id, '商品數量:', state.products.length);
-                  console.log('當前商品列表:', state.products.map(p => ({ id: p.id, name: p.name })));
-                  
-                  // 立即儲存並驗證
-                  const saveResult = saveProducts(state.products);
-                  console.log('儲存結果:', saveResult);
-                  
-                  // 驗證儲存是否成功
-                  if (saveResult) {
-                    const key = productsKey();
-                    const stored = localStorage.getItem(key);
-                    const parsed = stored ? JSON.parse(stored) : [];
-                    console.log('儲存後驗證 - localStorage 商品數量:', parsed.length);
-                    console.log('儲存後驗證 - localStorage 商品內容:', parsed.map(p => ({ id: p.id, name: p.name })));
-                  } else {
-                    console.error('儲存失敗！');
-                  }
-                  
-                  tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品');
-                });
-              };
-              
-              // 綁定新增商品按鈕事件
-              const btnAddInline = document.getElementById('btn-add-product-inline');
-              if (btnAddInline) {
-                btnAddInline.addEventListener('click', createInlineNewRow);
-              }
-              
-              // 綁定批量操作按鈕事件
-              const btnDelSelected = document.getElementById('btn-delete-selected');
-              if (btnDelSelected) {
-                btnDelSelected.addEventListener('click', ()=>{
-                  if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
-                  if (state.selection.size===0){ (window.toast||alert)('請先勾選要刪除的商品'); return; }
-                  if (!confirm(`確定刪除已勾選的 ${state.selection.size} 項商品？`)) return;
-                  state.products = state.products.filter(p=> !state.selection.has(p.id));
-                  state.selection.clear();
-                  saveProducts(state.products); // 自動儲存
-                  renderTable(); renderDM(); (window.toast||alert)('已刪除勾選商品');
-                });
-              }
-              
-              const btnDelAll = document.getElementById('btn-delete-all');
-              if (btnDelAll) {
-                btnDelAll.addEventListener('click', ()=>{
-                  if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
-                  if (!confirm('確定刪除全部商品？此操作無法還原！')) return;
-                  state.products = []; state.selection.clear();
-                  saveProducts(state.products); // 自動儲存
-                  renderTable(); renderDM(); (window.toast||alert)('已刪除全部商品');
-                });
-              }
-              
-              const btnAiSelected = document.getElementById('btn-ai-desc-selected');
-              if (btnAiSelected) {
-                btnAiSelected.addEventListener('click', ()=>{
-                  if (state.products.length===0){ (window.toast||alert)('目前沒有商品'); return; }
-                  const ids = [...state.selection];
-                  if (ids.length===0){ (window.toast||alert)('請先勾選商品'); return; }
-                  let updated = 0;
-                  ids.forEach(id=>{
-                    const product = state.products.find(p=>p.id===id);
-                    if (!product) return;
-                    const aiDescription = generateAIDescription(product.name, product.price, product.originalPrice, product.imageDataUrl);
-                    product.desc = aiDescription; updated++;
-                  });
-                  saveProducts(state.products); // 自動儲存
-                  renderTable(); (window.toast||alert)(`已為 ${updated} 項商品生成描述`);
-                });
-              }
-              
-            } catch(e){ console.warn('reloadPresets error', e); }
-          });
-        } else {
-          // 後備：若 Firebase 尚未可用，保證未登入狀態
-          console.log('Firebase 認證系統不可用，使用後備邏輯');
-          state.user = null; setUser(null);
-          state.products = []; // 未登入時保持商品列表為空
-          renderTable(); // 渲染空白的商品表格
-          try { reloadPresets(); } catch(e){}
-          try { renderDM(); } catch(e){}
-          
-          // 後備：為未登入用戶提供基本的新增商品功能（不儲存）
-          const createInlineNewRowFallback = ()=>{
-            console.log('使用後備新增商品功能（未登入）');
-            const exist = els.tbody.querySelector('tr[data-new="1"]');
-            if (exist){ exist.querySelector('input[placeholder="商品名稱"]').focus(); return; }
-            const tr = document.createElement('tr'); tr.className='border-b bg-yellow-50'; tr.dataset.new='1';
-            const newId = uid();
-            tr.innerHTML = `
-              <td class="p-2 align-top"></td>
-              <td class="p-2 align-top">
-                <div class="inline-block rounded-lg overflow-hidden cursor-pointer" id="newimg-${newId}" style="width:4rem;height:4rem;min-width:4rem;background:#f1f5f9;display:grid;place-items:center;">上傳</div>
-              </td>
-              <td class="p-2 align-top"><input class="w-48 border rounded-lg p-1" placeholder="商品名稱" id="newname-${newId}"></td>
-              <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="售價" id="newprice-${newId}"></td>
-              <td class="p-2 align-top"><input class="w-24 border rounded-lg p-1" type="number" placeholder="原價(選填)" id="newori-${newId}"></td>
-              <td class="p-2 align-top">
-                <div class="flex gap-1">
-                  <textarea class="flex-1 border rounded-lg p-1" rows="2" placeholder="描述(選填)" id="newdesc-${newId}"></textarea>
-                  <button type="button" class="px-3 py-1 text-xs rounded bg-blue-600 text-white" id="newai-${newId}">AI</button>
-                </div>
-              </td>
-              <td class="p-2 align-top">
-                <button type="button" class="px-3 py-1 text-xs rounded bg-emerald-600 text-white" id="newsave-${newId}">加入</button>
-                <button type="button" class="px-3 py-1 text-xs rounded bg-slate-400 text-white" id="newcancel-${newId}">取消</button>
-              </td>`;
-            els.tbody.prepend(tr);
-            tr.querySelector('input[placeholder="商品名稱"]').focus();
-            document.getElementById(`newimg-${newId}`).addEventListener('click', async ()=>{
-              const input = document.createElement('input'); input.type='file'; input.accept='image/*';
-              input.onchange = async (ev)=>{
-                const file = ev.target.files[0]; if (!file) return;
-                const url = await fileToDataUrl(file);
-                const box = document.getElementById(`newimg-${newId}`);
-                box.innerHTML = `<img src="${url}" class="w-full h-full object-cover"/>`; box.dataset.url = url;
-              };
-              input.click();
-            });
-            document.getElementById(`newai-${newId}`).addEventListener('click', ()=>{
-              const name = (document.getElementById(`newname-${newId}`).value||'').trim();
-              const price = Number(document.getElementById(`newprice-${newId}`).value||0);
-              const ori = Number(document.getElementById(`newori-${newId}`).value||0) || '';
-              const img = document.getElementById(`newimg-${newId}`).dataset.url||null;
-              const ai = generateAIDescription(name, price, ori, img);
-              document.getElementById(`newdesc-${newId}`).value = ai; (window.toast||alert)('已生成描述');
-            });
-            document.getElementById(`newcancel-${newId}`).addEventListener('click', ()=>{ tr.remove(); });
-            document.getElementById(`newsave-${newId}`).addEventListener('click', ()=>{
-              console.log('後備儲存商品按鈕被點擊（未登入）');
-              const name = (document.getElementById(`newname-${newId}`).value||'').trim();
-              const price = Number(document.getElementById(`newprice-${newId}`).value||0);
-              const ori = document.getElementById(`newori-${newId}`).value;
-              const desc = (document.getElementById(`newdesc-${newId}`).value||'').trim();
-              const imgUrl = document.getElementById(`newimg-${newId}`).dataset.url||'';
-              if (!name || !price){ (window.toast||alert)('請填寫商品名稱與售價'); return; }
-              state.products.unshift({ id: uid(), name, price, originalPrice: ori===''? '' : Number(ori), desc, imageDataUrl: imgUrl, updatedAt: new Date().toISOString() });
-              console.log('後備模式：商品已新增到記憶體，但不會儲存');
-              tr.remove(); renderTable(); renderDM(); (window.toast||alert)('已新增商品（未登入，不會儲存）');
-            });
-          };
-          
-          // 綁定後備新增商品按鈕
-          const btnAddInline = document.getElementById('btn-add-product-inline');
-          if (btnAddInline) {
-            btnAddInline.addEventListener('click', createInlineNewRowFallback);
-          }
-        }
-      } catch (e) {
-        console.error('用戶初始化失敗:', e);
-      }
+      renderShopPills(); renderCampaignPills(); renderChosenSummary(); updateGating(); initAccordion();
+      reloadPresets(); updatePresetControls(); renderTable(); renderDM(); applyScale();
+      runSelfTests();
       
-      // 商品資料載入邏輯已移到 Firebase 認證回調中
-
-
-      try {
-        console.log('開始渲染頁面元素');
-        renderShopPills(); 
-        renderCampaignPills(); 
-        renderChosenSummary(); 
-        updateGating(); 
-        initAccordion();
-        reloadPresets(); 
-        updatePresetControls(); 
-        updateTemplateSettings(); 
-        // renderTable() 和 renderDM() 會在 Firebase 認證回調中調用
-        applyScale();
-        
-        // 商品庫按鈕事件會在 Firebase 認證回調中綁定
-        
-        console.log('頁面渲染完成');
-      } catch (e) {
-        console.error('頁面渲染失敗:', e);
-      }
-      
-      // 確保DOM載入完成後再更新使用次數顯示
-      setTimeout(() => {
-        updateUsageDisplay();
-      }, 100);
-      
-      // runSelfTests(); // 註解：避免自動模擬登入影響UI顯示
-    }
-    
-    // 等待DOM載入完成後初始化
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        // 等待 Firebase 初始化完成後再初始化應用
-        window.addEventListener('load', initApp);
-      });
-    } else {
-      // 如果 DOM 已經載入，直接等待 load 事件
-      window.addEventListener('load', initApp);
-    }
-
-    // 頁面關閉前自動保存
-    window.addEventListener('beforeunload', () => {
-      if (state.user && state.products && state.products.length > 0) {
-        console.log('頁面關閉前自動保存商品，數量:', state.products.length);
-        console.log('頁面關閉前自動保存商品，內容:', state.products.map(p => ({ id: p.id, name: p.name })));
-        saveProducts(state.products);
-      }
-    });
-
-    // 頁面載入完成後的驗證
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        if (state.user && state.products) {
-          console.log('頁面載入完成後驗證 - 用戶:', state.user.id);
-          console.log('頁面載入完成後驗證 - 商品數量:', state.products.length);
-          console.log('頁面載入完成後驗證 - 商品內容:', state.products.map(p => ({ id: p.id, name: p.name })));
-          
-          // 檢查 localStorage 中的資料
-          const key = productsKey();
-          if (key) {
-            const raw = localStorage.getItem(key);
-            const stored = raw ? JSON.parse(raw) : [];
-            console.log('頁面載入完成後驗證 - localStorage 商品數量:', stored.length);
-            console.log('頁面載入完成後驗證 - localStorage 商品內容:', stored.map(p => ({ id: p.id, name: p.name })));
-            
-            // 如果 localStorage 有資料但 state.products 為空，強制同步
-            if (stored.length > 0 && state.products.length === 0) {
-              console.log('⚠️ 發現 localStorage 有資料但 state.products 為空，強制同步');
-              state.products = stored;
-              renderTable();
-              renderDM();
-            }
-          }
-        }
-      }, 2000);
-    });
+    })();
   })();
   </script>
 </body>

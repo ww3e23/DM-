@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR碼生成器 - 漸層版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .gradient-picker {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .gradient-option {
+            height: 60px;
+            border-radius: 10px;
+            border: 3px solid #fff;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gradient-option:hover {
+            transform: scale(1.05);
+        }
+
+        .gradient-option.selected {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .gradient-option .gradient-name {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            right: 5px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            padding: 2px;
+            border-radius: 3px;
+        }
+
+        .style-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .style-option {
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+        }
+
+        .style-option:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .style-option.selected {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .style-option .icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .output-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #qrcode {
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .qr-square {
+            border-radius: 0;
+        }
+
+        .qr-rounded {
+            border-radius: 15px;
+        }
+
+        .qr-circle {
+            border-radius: 50%;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .examples {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .examples h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .example-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            transition: background-color 0.2s;
+        }
+
+        .example-item:hover {
+            background: #f8f9fa;
+        }
+
+        .placeholder {
+            color: #6c757d;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .feature-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #2196f3;
+        }
+
+        .feature-info h4 {
+            color: #1976d2;
+            margin-bottom: 5px;
+        }
+
+        .feature-info p {
+            color: #1976d2;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .gradient-picker {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .style-options {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QR碼生成器</h1>
+            <p>漸層版 - 透明背景 + 漸層顏色</p>
+        </div>
+
+        <div class="content">
+            <div class="form-group">
+                <label for="qrType">QR碼類型</label>
+                <select id="qrType" onchange="updateInputFields()">
+                    <option value="text">文字</option>
+                    <option value="url">網址</option>
+                    <option value="wifi">WiFi</option>
+                    <option value="email">郵件</option>
+                    <option value="phone">電話</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>漸層顏色選擇</label>
+                    <div class="gradient-picker">
+                        <div class="gradient-option selected" data-gradient="linear-gradient(45deg, #000000, #333333)" style="background: linear-gradient(45deg, #000000, #333333);">
+                            <div class="gradient-name">黑白</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #4285f4, #34a853)" style="background: linear-gradient(45deg, #4285f4, #34a853);">
+                            <div class="gradient-name">藍綠</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #8e24aa, #e91e63)" style="background: linear-gradient(45deg, #8e24aa, #e91e63);">
+                            <div class="gradient-name">紫粉</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #ff6b35, #f7931e)" style="background: linear-gradient(45deg, #ff6b35, #f7931e);">
+                            <div class="gradient-name">橙黃</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #667eea, #764ba2)" style="background: linear-gradient(45deg, #667eea, #764ba2);">
+                            <div class="gradient-name">藍紫</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #28a745, #20c997)" style="background: linear-gradient(45deg, #28a745, #20c997);">
+                            <div class="gradient-name">綠青</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #dc3545, #e83e8c)" style="background: linear-gradient(45deg, #dc3545, #e83e8c);">
+                            <div class="gradient-name">紅粉</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #17a2b8, #6f42c1)" style="background: linear-gradient(45deg, #17a2b8, #6f42c1);">
+                            <div class="gradient-name">青靛</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #fd7e14, #ffc107)" style="background: linear-gradient(45deg, #fd7e14, #ffc107);">
+                            <div class="gradient-name">橘黃</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #6c757d, #495057)" style="background: linear-gradient(45deg, #6c757d, #495057);">
+                            <div class="gradient-name">灰黑</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #ff9a9e, #fecfef)" style="background: linear-gradient(45deg, #ff9a9e, #fecfef);">
+                            <div class="gradient-name">粉紅</div>
+                        </div>
+                        <div class="gradient-option" data-gradient="linear-gradient(45deg, #a8edea, #fed6e3)" style="background: linear-gradient(45deg, #a8edea, #fed6e3);">
+                            <div class="gradient-name">青粉</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>樣式選擇</label>
+                    <div class="style-options">
+                        <div class="style-option selected" data-style="square">
+                            <div class="icon">⬜</div>
+                            <div>方形</div>
+                        </div>
+                        <div class="style-option" data-style="rounded">
+                            <div class="icon">⬜</div>
+                            <div>圓角</div>
+                        </div>
+                        <div class="style-option" data-style="circle">
+                            <div class="icon">⭕</div>
+                            <div>圓形</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feature-info">
+                <h4>✨ 新功能特色</h4>
+                <p>• 透明背景：QR碼背景完全透明，適合任何設計</p>
+                <p>• 漸層顏色：12種精美漸層色彩選擇</p>
+                <p>• 多種樣式：方形、圓角、圓形三種樣式</p>
+            </div>
+
+            <div id="inputFields">
+                <div class="form-group">
+                    <label for="qrData">內容</label>
+                    <input type="text" id="qrData" placeholder="輸入要編碼的內容">
+                </div>
+            </div>
+
+            <button class="btn" onclick="generateQR()">🚀 生成QR碼</button>
+            
+            <div class="status" id="statusMessage"></div>
+
+            <div class="output-section" id="outputSection" style="display: none;">
+                <h2>📱 QR碼預覽</h2>
+                <div class="qr-container">
+                    <div id="qrcode" class="placeholder">QR碼將在這裡顯示</div>
+                </div>
+                <button class="download-btn" onclick="downloadQR()">📥 下載PNG (透明背景)</button>
+            </div>
+
+            <div class="examples">
+                <h3>💡 快速示例</h3>
+                <div class="example-item" onclick="fillExample('text', 'Hello World!')">
+                    📝 文字: Hello World!
+                </div>
+                <div class="example-item" onclick="fillExample('url', 'https://www.google.com')">
+                    🌐 網址: https://www.google.com
+                </div>
+                <div class="example-item" onclick="fillExample('phone', '+886-912-345-678')">
+                    📞 電話: +886-912-345-678
+                </div>
+                <div class="example-item" onclick="fillExample('email', 'test@example.com')">
+                    📧 郵件: test@example.com
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQRData = null;
+        let currentQRImage = null;
+        let selectedGradient = 'linear-gradient(45deg, #000000, #333333)';
+        let selectedStyle = 'square';
+
+        // 初始化漸層和樣式選擇
+        document.addEventListener('DOMContentLoaded', function() {
+            // 漸層選擇
+            document.querySelectorAll('.gradient-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.gradient-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedGradient = this.dataset.gradient;
+                });
+            });
+
+            // 樣式選擇
+            document.querySelectorAll('.style-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.style-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedStyle = this.dataset.style;
+                });
+            });
+
+            updateInputFields();
+            showStatus('QR碼生成器已就緒！', 'success');
+        });
+
+        // 更新輸入字段
+        function updateInputFields() {
+            const qrType = document.getElementById('qrType').value;
+            const inputFields = document.getElementById('inputFields');
+            let html = '';
+
+            switch(qrType) {
+                case 'text':
+                    html = '<div class="form-group"><label for="qrData">文字內容</label><input type="text" id="qrData" placeholder="輸入要編碼的文字"></div>';
+                    break;
+                case 'url':
+                    html = '<div class="form-group"><label for="qrData">網址</label><input type="url" id="qrData" placeholder="https://example.com"></div>';
+                    break;
+                case 'wifi':
+                    html = `
+                        <div class="form-group">
+                            <label for="wifiSSID">WiFi名稱</label>
+                            <input type="text" id="wifiSSID" placeholder="WiFi名稱">
+                        </div>
+                        <div class="form-group">
+                            <label for="wifiPassword">密碼</label>
+                            <input type="text" id="wifiPassword" placeholder="WiFi密碼">
+                        </div>
+                        <div class="form-group">
+                            <label for="wifiSecurity">安全類型</label>
+                            <select id="wifiSecurity">
+                                <option value="WPA">WPA/WPA2</option>
+                                <option value="WEP">WEP</option>
+                                <option value="nopass">無密碼</option>
+                            </select>
+                        </div>
+                    `;
+                    break;
+                case 'email':
+                    html = `
+                        <div class="form-group">
+                            <label for="emailAddress">郵件地址</label>
+                            <input type="email" id="emailAddress" placeholder="example@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="emailSubject">主題</label>
+                            <input type="text" id="emailSubject" placeholder="郵件主題">
+                        </div>
+                        <div class="form-group">
+                            <label for="emailBody">內容</label>
+                            <textarea id="emailBody" placeholder="郵件內容"></textarea>
+                        </div>
+                    `;
+                    break;
+                case 'phone':
+                    html = '<div class="form-group"><label for="qrData">電話號碼</label><input type="tel" id="qrData" placeholder="+886-912-345-678"></div>';
+                    break;
+            }
+
+            inputFields.innerHTML = html;
+        }
+
+        // 填充示例
+        function fillExample(type, data) {
+            document.getElementById('qrType').value = type;
+            updateInputFields();
+            
+            if (type === 'wifi') {
+                document.getElementById('wifiSSID').value = 'MyWiFi';
+                document.getElementById('wifiPassword').value = 'password123';
+            } else if (type === 'email') {
+                document.getElementById('emailAddress').value = data;
+                document.getElementById('emailSubject').value = 'Hello';
+                document.getElementById('emailBody').value = 'This is a test email';
+            } else {
+                document.getElementById('qrData').value = data;
+            }
+        }
+
+        // 生成QR碼
+        function generateQR() {
+            const qrType = document.getElementById('qrType').value;
+            let data = '';
+
+            // 根據類型獲取數據
+            switch(qrType) {
+                case 'text':
+                case 'url':
+                case 'phone':
+                    data = document.getElementById('qrData').value;
+                    break;
+                case 'wifi':
+                    const ssid = document.getElementById('wifiSSID').value;
+                    const password = document.getElementById('wifiPassword').value;
+                    const security = document.getElementById('wifiSecurity').value;
+                    if (!ssid.trim()) {
+                        showStatus('請輸入WiFi名稱', 'error');
+                        return;
+                    }
+                    data = `WIFI:T:${security};S:${ssid};P:${password};H:false;;`;
+                    break;
+                case 'email':
+                    const email = document.getElementById('emailAddress').value;
+                    const subject = document.getElementById('emailSubject').value;
+                    const body = document.getElementById('emailBody').value;
+                    if (!email.trim()) {
+                        showStatus('請輸入郵件地址', 'error');
+                        return;
+                    }
+                    data = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                    break;
+            }
+
+            if (!data.trim()) {
+                showStatus('請輸入要編碼的內容', 'error');
+                return;
+            }
+
+            showStatus('正在生成QR碼...', 'success');
+
+            // 使用支持透明背景的QR碼API
+            const apis = [
+                `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(data)}&bgcolor=transparent`,
+                `https://chart.googleapis.com/chart?chs=256x256&cht=qr&chl=${encodeURIComponent(data)}&chf=bg,s,transparent`,
+                `https://quickchart.io/qr?text=${encodeURIComponent(data)}&size=256&format=png&transparent=true`
+            ];
+
+            let currentApiIndex = 0;
+
+            function tryNextApi() {
+                if (currentApiIndex >= apis.length) {
+                    showStatus('所有QR碼服務都無法使用，請檢查網絡連接', 'error');
+                    return;
+                }
+
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = function() {
+                    // 成功載入，應用漸層效果
+                    applyGradientEffect(img);
+                };
+
+                img.onerror = function() {
+                    // 失敗，嘗試下一個API
+                    currentApiIndex++;
+                    tryNextApi();
+                };
+
+                img.src = apis[currentApiIndex];
+            }
+
+            tryNextApi();
+        }
+
+        // 應用漸層效果
+        function applyGradientEffect(img) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 256;
+
+            // 清空畫布（透明背景）
+            ctx.clearRect(0, 0, 256, 256);
+
+            // 繪製原始QR碼
+            ctx.drawImage(img, 0, 0, 256, 256);
+
+            // 獲取圖像數據
+            const imageData = ctx.getImageData(0, 0, 256, 256);
+            const data = imageData.data;
+
+            // 創建漸層
+            const gradient = ctx.createLinearGradient(0, 0, 256, 256);
+            
+            // 解析漸層顏色
+            const gradientMatch = selectedGradient.match(/linear-gradient\(45deg, (#[0-9a-fA-F]{6}), (#[0-9a-fA-F]{6})\)/);
+            if (gradientMatch) {
+                gradient.addColorStop(0, gradientMatch[1]);
+                gradient.addColorStop(1, gradientMatch[2]);
+            } else {
+                gradient.addColorStop(0, '#000000');
+                gradient.addColorStop(1, '#333333');
+            }
+
+            // 應用漸層到黑色像素
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i] < 128) { // 黑色像素
+                    const x = (i / 4) % 256;
+                    const y = Math.floor((i / 4) / 256);
+                    
+                    // 計算漸層顏色
+                    const ratio = (x + y) / (256 + 256);
+                    const color1 = hexToRgb(gradientMatch[1]);
+                    const color2 = hexToRgb(gradientMatch[2]);
+                    
+                    data[i] = Math.round(color1.r + (color2.r - color1.r) * ratio);     // R
+                    data[i + 1] = Math.round(color1.g + (color2.g - color1.g) * ratio); // G
+                    data[i + 2] = Math.round(color1.b + (color2.b - color1.b) * ratio); // B
+                    // data[i + 3] 保持不變 (Alpha)
+                }
+            }
+
+            // 將修改後的數據放回畫布
+            ctx.putImageData(imageData, 0, 0);
+
+            // 顯示結果
+            const container = document.getElementById('qrcode');
+            container.innerHTML = '';
+            
+            // 創建新的圖片元素
+            const newImg = new Image();
+            newImg.src = canvas.toDataURL('image/png');
+            newImg.className = `qr-${selectedStyle}`;
+            container.appendChild(newImg);
+            
+            currentQRData = canvas.toDataURL('image/png');
+            currentQRImage = newImg;
+            document.getElementById('outputSection').style.display = 'block';
+            showStatus('QR碼生成成功！', 'success');
+        }
+
+        // 將十六進制顏色轉換為RGB
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        // 下載PNG
+        function downloadQR() {
+            if (!currentQRData) {
+                showStatus('沒有可下載的QR碼', 'error');
+                return;
+            }
+
+            try {
+                // 創建下載鏈接
+                const link = document.createElement('a');
+                link.download = `qrcode_gradient_${selectedStyle}_${Date.now()}.png`;
+                link.href = currentQRData;
+                
+                // 觸發下載
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showStatus('QR碼已下載到您的下載文件夾！', 'success');
+            } catch (error) {
+                showStatus('下載失敗: ' + error.message, 'error');
+            }
+        }
+
+        // 顯示狀態消息
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>
